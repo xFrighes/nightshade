@@ -571,6 +571,7 @@ const App: React.FC = () => {
       {combat && (
         <CombatOverlay
           combat={combat}
+          maxHealth={story.maxHealth}
           onStrike={strikeKaelen}
           onGuard={guardKaelen}
           onRetry={retryCombat}
@@ -625,10 +626,11 @@ const InventoryOverlay: React.FC<{
 
 const CombatOverlay: React.FC<{
   combat: CombatState;
+  maxHealth: number;
   onStrike: () => void;
   onGuard: () => void;
   onRetry: () => void;
-}> = ({ combat, onStrike, onGuard, onRetry }) => {
+}> = ({ combat, maxHealth, onStrike, onGuard, onRetry }) => {
   const defeated = combat.elara <= 0;
 
   return (
@@ -637,7 +639,7 @@ const CombatOverlay: React.FC<{
         <h2>Kaelen's Order</h2>
         <p>{defeated ? 'Elara falls to one knee. The bridge blurs. Try the duel again.' : combat.message}</p>
         <div className="combat-bars">
-          <span>Elara {Math.max(0, combat.elara)} / 6</span>
+          <span>Elara {Math.max(0, combat.elara)} / {maxHealth}</span>
           <span>Kaelen {combat.kaelen} / 6</span>
         </div>
         <div className="dialog-options">
@@ -660,7 +662,23 @@ const loadStory = (): StoryState => {
   if (!raw) return INITIAL_STORY_STATE;
 
   try {
-    return { ...INITIAL_STORY_STATE, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const maxHealth = parsed.maxHealth !== undefined && !isNaN(Number(parsed.maxHealth)) 
+      ? Number(parsed.maxHealth) 
+      : INITIAL_STORY_STATE.maxHealth;
+      
+    let parsedHealth = Number(parsed.health);
+    if (isNaN(parsedHealth)) {
+      parsedHealth = maxHealth;
+    }
+    const health = Math.max(0, Math.min(maxHealth, parsedHealth));
+
+    return { 
+      ...INITIAL_STORY_STATE, 
+      ...parsed,
+      maxHealth,
+      health
+    };
   } catch {
     return INITIAL_STORY_STATE;
   }

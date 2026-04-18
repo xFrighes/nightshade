@@ -80,8 +80,8 @@ export const INITIAL_STORY_STATE: StoryState = {
   scene: 'cell',
   inventory: ['bread'],
   gold: 0,
-  health: 6,
-  maxHealth: 6,
+  health: 5,
+  maxHealth: 5,
   flags: {
     ratDistracted: false,
     daggerFound: false,

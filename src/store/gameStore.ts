@@ -65,8 +65,8 @@ const INITIAL_STATE: PlayerState = {
   name: 'Initiate',
   level: 1,
   xp: 0,
-  health: 10,
-  maxHealth: 10,
+  health: 5,
+  maxHealth: 5,
   gold: 5,
   reputation: {
     'Nightshade': 0,
@@ -178,7 +178,10 @@ class GameStore extends EventTarget {
     const savedState = localStorage.getItem('nightshade_game_state');
     if (savedState) {
       try {
-        this.state = { ...INITIAL_STATE, ...JSON.parse(savedState) };
+        const loaded = JSON.parse(savedState);
+        const maxHealth = Math.min(loaded.maxHealth ?? INITIAL_STATE.maxHealth, 5);
+        const health = Math.max(0, Math.min(loaded.health ?? INITIAL_STATE.health, maxHealth));
+        this.state = { ...INITIAL_STATE, ...loaded, maxHealth, health };
       } catch (e) {
         console.error('Failed to load save data', e);
       }
