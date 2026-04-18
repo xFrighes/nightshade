@@ -67,7 +67,12 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg_escape', '/bg_escape.png');
     this.load.image('bg_city', '/bg_city.png');
     this.load.image('bg_underground', '/bg_underground.png');
-    this.load.atlas('player_anim', '/player_sheet.png', '/player_sheet.json');
+    
+    // Load ONLY the requested individual Elara sprites
+    const spriteDir = '/elara_sprites/';
+    this.load.image('elara_idle_1', spriteDir + 'pose_side_no_weapon_idle_1.png');
+    this.load.image('elara_idle_2', spriteDir + 'pose_side_no_weapon_idle_2.png');
+    this.load.image('elara_jump', spriteDir + 'pose_action_jump_1.png');
   }
 
   private getWorldHeight() {
@@ -85,33 +90,41 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, 2200, worldHeight);
     this.cameras.main.setBounds(0, 0, 2200, worldHeight);
 
-    if (!this.anims.exists('player-idle')) {
-      this.anims.create({
-        key: 'player-idle',
-        frames: this.anims.generateFrameNames('player_anim', { prefix: 'idle_', start: 0, end: 3 }),
-        frameRate: 6,
-        repeat: -1,
-      });
-    }
+    // Re-create animations to ensure they override any existing ones
+    this.anims.create({
+      key: 'player-idle',
+      frames: [{ key: 'elara_idle_1' }],
+      frameRate: 1,
+      repeat: -1,
+    });
 
-    if (!this.anims.exists('player-walk')) {
-      this.anims.create({
-        key: 'player-walk',
-        frames: this.anims.generateFrameNames('player_anim', { prefix: 'walk_', start: 0, end: 4 }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    this.anims.create({
+      key: 'player-walk',
+      frames: [
+        { key: 'elara_idle_1' },
+        { key: 'elara_idle_2' }
+      ],
+      frameRate: 6,
+      repeat: -1,
+    });
 
-    this.player = this.physics.add.sprite(130, this.getBaseY(), 'player_anim');
+    this.anims.create({
+      key: 'player-jump',
+      frames: [{ key: 'elara_jump' }],
+      frameRate: 1,
+      repeat: -1,
+    });
+
+    this.player = this.physics.add.sprite(130, this.getBaseY(), 'elara_idle_1');
     this.player.setOrigin(0.5, 1);
-    this.player.setScale((110 / 500) * 2.4);
+    this.player.setScale(0.85); 
     this.player.setCollideWorldBounds(true);
     this.player.play('player-idle');
 
+    // Use a STABLE hitbox that doesn't change with frame size
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    body.setSize(80, 200);
-    body.setOffset(80, 300);
+    body.setSize(80, 280);
+    body.setOffset(10, 20);
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setFollowOffset(0, 80);
@@ -152,14 +165,8 @@ export class GameScene extends Phaser.Scene {
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     
-    // Dynamically adjust offset to keep feet aligned with the bottom of the frame
-    const frameWidth = this.player.frame.realWidth;
-    const frameHeight = this.player.frame.realHeight;
-    body.setSize(80, 200);
-    body.setOffset((frameWidth - 80) / 2, frameHeight - 200);
-
     const speed = this.currentState?.flags.runeTaken ? 285 : 245;
-    const jump = this.currentState?.flags.runeTaken ? 610 : 470;
+    const jumpVelocity = this.currentState?.flags.runeTaken ? 610 : 470;
     const left = this.cursors.left.isDown || this.wasd.A.isDown || this.virtualInput.left;
     const right = this.cursors.right.isDown || this.wasd.D.isDown || this.virtualInput.right;
     const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasd.W) || this.virtualInput.jump;
@@ -175,11 +182,19 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (jumpPressed && body.blocked.down) {
-      body.setVelocityY(-jump);
+      body.setVelocityY(-jumpVelocity);
       this.virtualInput.jump = false;
     }
 
-    this.player.play(left || right ? 'player-walk' : 'player-idle', true);
+    // Stable Animation Logic
+    if (!body.blocked.down) {
+      this.player.play('player-jump', true);
+    } else if (left || right) {
+      this.player.play('player-walk', true);
+    } else {
+      this.player.play('player-idle', true);
+    }
+
     this.player.setDepth(this.player.y);
     this.updateNearestInteractable();
 

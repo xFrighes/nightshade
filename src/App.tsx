@@ -663,11 +663,21 @@ const loadStory = (): StoryState => {
 
   try {
     const parsed = JSON.parse(raw);
+    const maxHealth = parsed.maxHealth !== undefined && !isNaN(Number(parsed.maxHealth)) 
+      ? Number(parsed.maxHealth) 
+      : INITIAL_STORY_STATE.maxHealth;
+      
+    let parsedHealth = Number(parsed.health);
+    if (isNaN(parsedHealth)) {
+      parsedHealth = maxHealth;
+    }
+    const health = Math.max(0, Math.min(maxHealth, parsedHealth));
+
     return { 
       ...INITIAL_STORY_STATE, 
       ...parsed,
-      maxHealth: 5,
-      health: Math.min(5, parsed.health ?? 5)
+      maxHealth,
+      health
     };
   } catch {
     return INITIAL_STORY_STATE;

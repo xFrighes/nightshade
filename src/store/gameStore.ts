@@ -178,7 +178,10 @@ class GameStore extends EventTarget {
     const savedState = localStorage.getItem('nightshade_game_state');
     if (savedState) {
       try {
-        this.state = { ...INITIAL_STATE, ...JSON.parse(savedState) };
+        const loaded = JSON.parse(savedState);
+        const maxHealth = Math.min(loaded.maxHealth ?? INITIAL_STATE.maxHealth, 5);
+        const health = Math.max(0, Math.min(loaded.health ?? INITIAL_STATE.health, maxHealth));
+        this.state = { ...INITIAL_STATE, ...loaded, maxHealth, health };
       } catch (e) {
         console.error('Failed to load save data', e);
       }
