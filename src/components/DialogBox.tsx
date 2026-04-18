@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
 import { gameStore } from '../store/gameStore';
 import { GeminiService } from '../services/GeminiService';
@@ -13,13 +13,7 @@ export const DialogBox: React.FC<DialogBoxProps> = ({ npc, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<{ label: string; action: () => void }[]>([]);
 
-  useEffect(() => {
-    if (npc) {
-      generateGreeting(npc);
-    }
-  }, [npc]);
-
-  const generateGreeting = async (targetNpc: { id: string; name: string }) => {
+  const generateGreeting = useCallback(async (targetNpc: { id: string; name: string }) => {
     setLoading(true);
     setText("");
     
@@ -61,7 +55,14 @@ export const DialogBox: React.FC<DialogBoxProps> = ({ npc, onClose }) => {
     } else {
       setOptions([{ label: "Farewell.", action: onClose }]);
     }
-  };
+  }, [onClose]);
+
+  useEffect(() => {
+    if (npc) {
+      const timer = setTimeout(() => void generateGreeting(npc), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [generateGreeting, npc]);
 
   if (!npc) return null;
 

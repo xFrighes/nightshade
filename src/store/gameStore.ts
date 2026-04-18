@@ -25,6 +25,35 @@ export type PlayerState = {
   quests: Quest[];
 };
 
+export type SettingsState = {
+  audio: {
+    masterVolume: number;
+    musicVolume: number;
+    voiceActing: boolean;
+    audioQuality: string;
+    subtitles: boolean;
+    language: string;
+  };
+  video: {
+    resolution: string;
+    fullscreen: boolean;
+    vsync: boolean;
+    antiAliasing: string;
+    textureQuality: string;
+  };
+  gameplay: {
+    difficulty: string;
+    cameraShake: boolean;
+    tutorialTooltips: boolean;
+    autoSave: boolean;
+  };
+  controls: {
+    invertY: boolean;
+    mouseSensitivity: number;
+    keyBindings: Record<string, string>;
+  };
+};
+
 export type WorldLogEntry = {
   id: string;
   timestamp: number;
@@ -51,8 +80,45 @@ const INITIAL_STATE: PlayerState = {
   ]
 };
 
+const INITIAL_SETTINGS: SettingsState = {
+  audio: {
+    masterVolume: 0.8,
+    musicVolume: 0.6,
+    voiceActing: true,
+    audioQuality: 'Medium / High',
+    subtitles: true,
+    language: 'English',
+  },
+  video: {
+    resolution: '1920x1080',
+    fullscreen: true,
+    vsync: true,
+    antiAliasing: 'TAA',
+    textureQuality: 'High',
+  },
+  gameplay: {
+    difficulty: 'Normal',
+    cameraShake: true,
+    tutorialTooltips: true,
+    autoSave: true,
+  },
+  controls: {
+    invertY: false,
+    mouseSensitivity: 0.5,
+    keyBindings: {
+      moveUp: 'W',
+      moveDown: 'S',
+      moveLeft: 'A',
+      moveRight: 'D',
+      interact: 'E',
+      inventory: 'I',
+    },
+  },
+};
+
 class GameStore extends EventTarget {
   private state: PlayerState = { ...INITIAL_STATE };
+  private settings: SettingsState = { ...INITIAL_SETTINGS };
   private worldLogs: WorldLogEntry[] = [];
 
   constructor() {
@@ -62,12 +128,22 @@ class GameStore extends EventTarget {
   }
 
   getState() { return this.state; }
+  getSettings() { return this.settings; }
   getLogs() { return this.worldLogs; }
 
   updateState(update: Partial<PlayerState>) {
     this.state = { ...this.state, ...update };
     this.saveToStorage();
     this.dispatchEvent(new CustomEvent('change', { detail: this.state }));
+  }
+
+  updateSettings<K extends keyof SettingsState>(category: K, update: Partial<SettingsState[K]>) {
+    this.settings = {
+      ...this.settings,
+      [category]: { ...this.settings[category], ...update },
+    };
+    this.saveToStorage();
+    this.dispatchEvent(new CustomEvent('settingsChange', { detail: this.settings }));
   }
 
   addLog(text: string, type: WorldLogEntry['type'] = 'info') {
@@ -99,18 +175,27 @@ class GameStore extends EventTarget {
   }
 
   private loadFromStorage() {
-    const saved = localStorage.getItem('nightshade_game_state');
-    if (saved) {
+    const savedState = localStorage.getItem('nightshade_game_state');
+    if (savedState) {
       try {
-        this.state = { ...INITIAL_STATE, ...JSON.parse(saved) };
+        this.state = { ...INITIAL_STATE, ...JSON.parse(savedState) };
       } catch (e) {
         console.error('Failed to load save data', e);
+      }
+    }
+    const savedSettings = localStorage.getItem('nightshade_settings');
+    if (savedSettings) {
+      try {
+        this.settings = { ...INITIAL_SETTINGS, ...JSON.parse(savedSettings) };
+      } catch (e) {
+        console.error('Failed to load settings data', e);
       }
     }
   }
 
   private saveToStorage() {
     localStorage.setItem('nightshade_game_state', JSON.stringify(this.state));
+    localStorage.setItem('nightshade_settings', JSON.stringify(this.settings));
   }
 
   private generateMockLogs() {
