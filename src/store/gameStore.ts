@@ -65,8 +65,8 @@ const INITIAL_STATE: PlayerState = {
   name: 'Initiate',
   level: 1,
   xp: 0,
-  health: 10,
-  maxHealth: 10,
+  health: 5,
+  maxHealth: 5,
   gold: 5,
   reputation: {
     'Nightshade': 0,
