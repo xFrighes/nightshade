@@ -85,7 +85,7 @@ export const INITIAL_STORY_STATE: StoryState = {
     gateOutcome: 'none',
   },
   log: [
-    'Elara wakes in the Iron Cell. No bread, no key — only the guard and the rat.',
+    // 'Elara wakes in the Iron Cell. No bread, no key — only the guard and the rat.',
   ],
   dialogueHistory: [],
 };

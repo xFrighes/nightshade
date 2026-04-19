@@ -18,7 +18,13 @@ const WEAKNESSES: KaelenWeakness[] = ['Debt', 'Family', 'Superstition'];
 const TEXT_MODEL = 'gemini-2.5-flash';
 
 export class GeminiService {
-  private static readonly API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+  private static get API_KEY(): string {
+    return (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
+  }
+
+  static isConfigured(): boolean {
+    return this.API_KEY.length > 0;
+  }
 
   static readonly kaelenPersonality: KaelenPersonality =
     PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
@@ -49,14 +55,8 @@ Rules:
     playerMessage: string,
     dialogueHistory: string[]
   ): Promise<{ line: string; escaped: boolean }> {
-    const fallbacks = [
-      `Kaelen grips his spear tighter. "Your words reach something I buried long ago. Go before I change my mind."`,
-      `Kaelen studies you through the bars, jaw tight. "Every prisoner says they're innocent. You... might not be lying."`,
-      `"Say that again and you'll see what an order really means." Kaelen's knuckles whiten on the shaft.`,
-    ];
-
     if (!this.API_KEY) {
-      return { line: fallbacks[Math.floor(Math.random() * fallbacks.length)], escaped: false };
+      throw new Error('Gemini is not configured. Set VITE_GEMINI_API_KEY in .env and restart the dev server.');
     }
 
     try {
@@ -75,12 +75,58 @@ Rules:
       });
 
       const text = (response.text ?? '').trim();
-      if (!text) return { line: fallbacks[Math.floor(Math.random() * fallbacks.length)], escaped: false };
+      if (!text) {
+        throw new Error('Gemini returned an empty response.');
+      }
       const escaped = text.includes('[ESCAPE_SUCCESS]');
       return { line: text.replace('[ESCAPE_SUCCESS]', '').trim(), escaped };
     } catch (err) {
       console.error('Gemini Kaelen error:', err);
-      return { line: fallbacks[Math.floor(Math.random() * fallbacks.length)], escaped: false };
+      throw err instanceof Error
+        ? err
+        : new Error('Gemini failed to generate Kaelen response.');
+    }
+  }
+
+  static async generateKaelenGreeting(
+    scene: 'cell' | 'gate',
+    state: StoryState
+  ): Promise<string> {
+    if (!this.API_KEY) {
+      throw new Error('Gemini is not configured. Set VITE_GEMINI_API_KEY in .env and restart the dev server.');
+    }
+
+    const sceneContext = scene === 'cell'
+      ? 'Elara is still locked behind the Iron Cell bars and has just approached Kaelen.'
+      : 'Elara has reached the Great Gate. Kaelen blocks the bridge, but his conscience is strained.';
+
+    try {
+      const ai = this.getAI();
+      const response = await ai.models.generateContent({
+        model: TEXT_MODEL,
+        config: {
+          systemInstruction: `${this.kaelenSystemInstruction()}
+
+Opening-line rules:
+1. Write only Kaelen's next spoken line plus sparse body language.
+2. Do not include [ESCAPE_SUCCESS] in this opener.
+3. Keep it under 2 sentences.
+4. Reflect current mood: ${state.flags.kaelenMood}.`,
+        },
+        contents: `${sceneContext}
+Recent dialogue: ${state.dialogueHistory.slice(-6).join(' | ') || 'None yet.'}`,
+      });
+
+      const text = (response.text ?? '').trim();
+      if (!text) {
+        throw new Error('Gemini returned an empty greeting.');
+      }
+      return text.replace('[ESCAPE_SUCCESS]', '').trim();
+    } catch (err) {
+      console.error('Gemini Kaelen greeting error:', err);
+      throw err instanceof Error
+        ? err
+        : new Error('Gemini failed to generate Kaelen greeting.');
     }
   }
 

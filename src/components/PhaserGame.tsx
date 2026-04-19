@@ -41,11 +41,12 @@ export const PhaserGame: React.FC<PhaserGameProps> = ({
     if (!containerRef.current || gameRef.current) return;
 
     try {
+      const parent = containerRef.current;
       const config: Phaser.Types.Core.GameConfig = {
         type: Phaser.AUTO,
-        parent: containerRef.current,
-        width: window.innerWidth,
-        height: window.innerHeight,
+        parent: parent,
+        width: parent.clientWidth || window.innerWidth,
+        height: parent.clientHeight || window.innerHeight,
         physics: {
           default: 'arcade',
           arcade: {
@@ -97,5 +98,5 @@ export const PhaserGame: React.FC<PhaserGameProps> = ({
     gameRef.current.events.emit('story_update', storyState);
   }, [storyState]);
 
-  return <div ref={containerRef} className="fixed inset-0 w-full h-full z-0" />;
+  return <div ref={containerRef} className="game-container" />;
 };

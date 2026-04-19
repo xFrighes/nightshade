@@ -15,7 +15,7 @@ const CELL_BARS_RIGHT_EDGE = 720;
 const CELL_SPAWN_X = 200;
 
 const SCENE_TITLES: Record<StorySceneId, string> = {
-  cell: 'Scene 1 — The Iron Cell',
+  cell: '', // 'Scene 1 — The Iron Cell',
   market: 'Scene 2 — The Under-Market',
   cathedral: 'Scene 3 — The Cathedral Ward',
   gate: 'Scene 4 — The Great Gate',
@@ -390,7 +390,7 @@ export class GameScene extends Phaser.Scene {
     const overlay = this.add.rectangle(width / 2, height / 2, width * 3, height * 3, 0x000000, 0)
       .setScrollFactor(0).setDepth(9998);
     const text = this.add.text(width / 2, height / 2,
-      'Year 3 of the Darkness.\n\nThe Iron Cell  —  City of Ashenmoor.\n\nElara wakes.', {
+      '' /* 'Year 3 of the Darkness.\n\nThe Iron Cell  —  City of Ashenmoor.\n\nElara wakes.' */, {
       fontFamily: 'VT323, monospace',
       fontSize: `${Math.round(this.v(44))}px`,
       color: '#e8d0a0',

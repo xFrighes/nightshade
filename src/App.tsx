@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Heart, KeyRound, Loader2, Package, RotateCcw, ScrollText, Shield, Sparkles, Wallet, X } from 'lucide-react';
+import { ChevronRight, KeyRound, Loader2, Package, RotateCcw, Shield, Sparkles, Wallet, X } from 'lucide-react';
 import { PhaserGame } from './components/PhaserGame';
 import { SettingsWindow } from './components/SettingsWindow';
 import { GeminiService } from './services/GeminiService';
@@ -34,12 +34,9 @@ type CombatState = {
   message: string;
 };
 
-const sceneObjectives: Record<StorySceneId, string> = {
-  cell: 'Use Bread, win Kaelen over, and escape the Iron Cell.',
-  market: 'Climb for the Coin Pouch, then bargain with Silas for a gate pass.',
-  cathedral: 'Reach the rooftops and decide whether to accept the Purple Rune.',
-  gate: 'Open the gate with mercy, a key, the Rune, or steel.',
-  outskirts: 'Walk into the fog and learn what kind of legend Elara became.',
+const formatKaelenGeminiError = (err: unknown): string => {
+  const message = err instanceof Error ? err.message : 'Gemini failed to answer.';
+  return `Gemini could not answer as Kaelen. ${message}`;
 };
 
 const App: React.FC = () => {
@@ -61,7 +58,7 @@ const App: React.FC = () => {
   storyRef.current = story;
 
   useEffect(() => {
-    const images = ['/starting-screen.png', '/bg.png'];
+    const images = ['/starting-screen.png', '/bg.png', '/UI.png'];
     let loadedCount = 0;
     images.forEach(src => {
       const img = new Image();
@@ -274,25 +271,45 @@ const App: React.FC = () => {
           onInput: handleCellKaelenInput,
         });
       }
-    } catch {
+    } catch (err: unknown) {
+      const canRetry = GeminiService.isConfigured();
       setDialog({
         speaker: 'Kaelen',
-        text: 'Kaelen turns away without a word.',
+        text: formatKaelenGeminiError(err),
         options: [{ label: 'Step back', action: () => setDialog(null) }],
+        inputMode: canRetry,
+        onInput: canRetry ? handleCellKaelenInput : undefined,
       });
     } finally {
       setIsAiLoading(false);
     }
   }, []); // stable — reads fresh story via storyRef
 
-  const openKaelenCell = () => {
-    setDialog({
-      speaker: 'Kaelen',
-      text: 'The guard keeps one hand on his spear. His eyes are tired — but not empty.',
-      options: [{ label: 'Back away', action: () => setDialog(null) }],
-      inputMode: true,
-      onInput: handleCellKaelenInput,
-    });
+  const openKaelenCell = async () => {
+    setIsAiLoading(true);
+    setDialog({ speaker: 'Kaelen', text: '...', options: [] });
+
+    try {
+      const line = await GeminiService.generateKaelenGreeting('cell', storyRef.current);
+      setDialog({
+        speaker: 'Kaelen',
+        text: line,
+        options: [{ label: 'Back away', action: () => setDialog(null) }],
+        inputMode: true,
+        onInput: handleCellKaelenInput,
+      });
+    } catch (err: unknown) {
+      const canRetry = GeminiService.isConfigured();
+      setDialog({
+        speaker: 'Kaelen',
+        text: formatKaelenGeminiError(err),
+        options: [{ label: 'Back away', action: () => setDialog(null) }],
+        inputMode: canRetry,
+        onInput: canRetry ? handleCellKaelenInput : undefined,
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const openSilas = () => {
@@ -404,29 +421,53 @@ const App: React.FC = () => {
           onInput: handleGateKaelenInput,
         });
       }
-    } catch {
+    } catch (err: unknown) {
+      const canRetry = GeminiService.isConfigured();
       setDialog({
         speaker: 'Kaelen',
-        text: '"Enough words." Kaelen raises his spear.',
+        text: formatKaelenGeminiError(err),
         options: [{ label: 'Fight', action: startCombat }],
+        inputMode: canRetry,
+        onInput: canRetry ? handleGateKaelenInput : undefined,
       });
     } finally {
       setIsAiLoading(false);
     }
   }, []); // stable — reads fresh story via storyRef
 
-  const openGateKaelen = () => {
-    setDialog({
-      speaker: 'Kaelen',
-      text: 'Kaelen blocks the bridge, helmet under one arm. "Orders say you stop here. My conscience has been less clear."',
-      options: [
-        { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
-        { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
-        { label: 'Draw steel', action: startCombat },
-      ],
-      inputMode: true,
-      onInput: handleGateKaelenInput,
-    });
+  const openGateKaelen = async () => {
+    setIsAiLoading(true);
+    setDialog({ speaker: 'Kaelen', text: '...', options: [] });
+
+    try {
+      const line = await GeminiService.generateKaelenGreeting('gate', storyRef.current);
+      setDialog({
+        speaker: 'Kaelen',
+        text: line,
+        options: [
+          { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
+          { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
+          { label: 'Draw steel', action: startCombat },
+        ],
+        inputMode: true,
+        onInput: handleGateKaelenInput,
+      });
+    } catch (err: unknown) {
+      const canRetry = GeminiService.isConfigured();
+      setDialog({
+        speaker: 'Kaelen',
+        text: formatKaelenGeminiError(err),
+        options: [
+          { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
+          { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
+          { label: 'Draw steel', action: startCombat },
+        ],
+        inputMode: canRetry,
+        onInput: canRetry ? handleGateKaelenInput : undefined,
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const useGateKey = () => {
@@ -632,29 +673,44 @@ const App: React.FC = () => {
 
       {!isLoading && uiVisible && (
         <React.Fragment key={hudKey}>
-          <div className="game-hud">
-            <div className="hud-card hero-status">
-              <div className="hero-medallion">
-                <Shield size={32} />
-              </div>
-              <div>
-                <strong>ELARA</strong>
-                <span>{sceneObjectives[story.scene]}</span>
-              </div>
-              <div className="health-row">
-                {Array.from({ length: story.maxHealth }).map((_, index) => (
-                  <Heart key={index} size={18} fill={index < story.health ? 'currentColor' : 'none'} />
-                ))}
-              </div>
+          <img src="/UI.png" className="game-frame-overlay" alt="" />
+
+          {/* Top-left: character portrait */}
+          <div className="ui-portrait">
+            <img src="/portrait.png" className="ui-portrait-img" alt="Character" />
+          </div>
+
+          {/* Top-left: HP bars to the right of portrait */}
+          <div className="ui-hp-section">
+            <div className="ui-char-name">ELARA</div>
+            <div className="ui-hp-bar ui-hp-bar--health">
+              <div className="ui-hp-fill" style={{ width: `${(story.health / story.maxHealth) * 100}%` }} />
             </div>
+            <div className="ui-hp-bar ui-hp-bar--stamina">
+              <div className="ui-hp-fill ui-hp-fill--secondary" style={{ width: '100%' }} />
+            </div>
+          </div>
 
-            <button className="hud-button" onClick={() => setInventoryOpen(true)} title="Inventory">
-              <Package size={22} />
-              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px' }}>{inventory.length}</span>
+          {/* Gold display – bottom of left panel */}
+          <div className="ui-gold">
+            <KeyRound size={13} />
+            <span>{story.gold}</span>
+          </div>
+
+          {/* Story log – left side below character panel */}
+          <div className="ui-story-log">
+            {story.log.slice(0, 5).map((entry, index) => (
+              <p key={`${entry}-${index}`}>{entry}</p>
+            ))}
+          </div>
+
+          {/* Top-right: action buttons */}
+          <div className="ui-action-buttons">
+            <button className="ui-icon-btn" onClick={() => setInventoryOpen(true)} title="Inventory">
+              <Package size={20} />
             </button>
-
             <button
-              className="hud-button"
+              className="ui-icon-btn"
               title={walletAddress ? `Connected: ${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}` : 'Connect Phantom wallet'}
               onClick={async () => {
                 if (walletAddress) return;
@@ -668,39 +724,28 @@ const App: React.FC = () => {
               }}
               style={{ opacity: walletAddress ? 1 : 0.6 }}
             >
-              <Wallet size={22} />
-              {walletAddress && (
-                <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '9px' }}>
-                  {walletAddress.slice(0, 4)}
-                </span>
-              )}
+              <Wallet size={20} />
             </button>
-
-            <button className="hud-button" onClick={resetGame} title="Reset story">
-              <RotateCcw size={22} />
+            <button className="ui-icon-btn" onClick={resetGame} title="Reset story">
+              <RotateCcw size={20} />
             </button>
           </div>
 
-          <div className="story-log">
-            <div className="story-log-title">
-              <ScrollText size={18} /> CHRONICLE
-            </div>
-            {story.log.map((entry, index) => (
-              <p key={`${entry}-${index}`}>{entry}</p>
-            ))}
-          </div>
-
-          <div className="quick-inventory">
-            {inventory.map((item) => (
-              <div key={item.id} className={item.id === 'purple_rune' ? 'slot cursed' : 'slot'} title={item.description}>
-                <span>{item.icon}</span>
-                <small>{item.name}</small>
-              </div>
-            ))}
-            <div className="gold">
-              <KeyRound size={16} />
-              <span style={{ fontSize: '14px' }}>{story.gold}</span>
-            </div>
+          {/* Bottom: 10-slot hotbar */}
+          <div className="ui-hotbar">
+            {Array.from({ length: 10 }).map((_, i) => {
+              const item = inventory[i];
+              return (
+                <div
+                  key={i}
+                  className={`ui-slot${item?.id === 'purple_rune' ? ' cursed' : ''}`}
+                  title={item?.description}
+                >
+                  {item && <span className="ui-slot-icon">{item.icon}</span>}
+                  <small className="ui-slot-num">{i + 1}</small>
+                </div>
+              );
+            })}
           </div>
         </React.Fragment>
       )}

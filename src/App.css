@@ -11,6 +11,7 @@
   &:hover {
     border-color: var(--accent-border);
   }
+
   &:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -42,8 +43,7 @@
     z-index: 1;
     top: 34px;
     height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
+    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg) scale(1.4);
   }
 
   .vite {
@@ -51,8 +51,7 @@
     top: 107px;
     height: 26px;
     width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
+    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg) scale(0.8);
   }
 }
 
@@ -75,9 +74,10 @@
   border-top: 1px solid var(--border);
   text-align: left;
 
-  & > div {
+  &>div {
     flex: 1 1 0;
     padding: 32px;
+
     @media (max-width: 1024px) {
       padding: 24px 20px;
     }
@@ -130,6 +130,7 @@
     &:hover {
       box-shadow: var(--shadow);
     }
+
     .button-icon {
       height: 18px;
       width: 18px;
@@ -156,6 +157,7 @@
 #spacer {
   height: 88px;
   border-top: 1px solid var(--border);
+
   @media (max-width: 1024px) {
     height: 48px;
   }
@@ -174,7 +176,8 @@
 
 .settings-wrapper {
   position: relative;
-  padding-top: 60px; /* Space for the banner */
+  padding-top: 60px;
+  /* Space for the banner */
 }
 
 .settings-banner {
@@ -194,7 +197,7 @@
 /* Approximate Raven Banner with SVG/CSS */
 .raven-logo {
   color: #1a1a1a;
-  filter: drop-shadow(0 4px 4px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.5));
 }
 
 .banner-ribbon {
@@ -208,12 +211,12 @@
 }
 
 .settings-container {
-  background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('/bg.png');
+  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/bg.png');
   background-size: cover;
   background-position: center;
   border: 16px solid #4a3728;
   border-image: linear-gradient(#5d4037, #3e2723) 32;
-  box-shadow: 0 0 0 4px #2a1f18, inset 0 0 100px rgba(0,0,0,0.9);
+  box-shadow: 0 0 0 4px #2a1f18, inset 0 0 100px rgba(0, 0, 0, 0.9);
   position: relative;
   width: 860px;
   height: 520px;
@@ -256,7 +259,7 @@
   text-transform: uppercase;
   cursor: pointer;
   border-radius: 8px 8px 0 0;
-  box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.5);
 }
 
 .hud-button,
@@ -313,7 +316,7 @@
 .combat-panel {
   background: #1a1008;
   border: 6px solid #4a3728;
-  box-shadow: 0 8px 0 #2a1f18, inset 0 0 40px rgba(0,0,0,0.8);
+  box-shadow: 0 8px 0 #2a1f18, inset 0 0 40px rgba(0, 0, 0, 0.8);
   position: relative;
 }
 
@@ -350,7 +353,7 @@
   color: #ffe0a0;
   background: #3e2723;
   border: 4px solid #5d4037;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .hero-status strong {
@@ -374,7 +377,7 @@
   display: flex;
   gap: 4px;
   color: #ef4444;
-  filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.5));
 }
 
 .hud-button {
@@ -439,7 +442,7 @@
   color: #ffe0a0;
   background: #3e2723;
   border: 4px solid #5d4037;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .slot.cursed {
@@ -482,7 +485,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 32px;
-  background: radial-gradient(circle at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.8) 100%);
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.8) 100%);
   pointer-events: auto;
   animation: fadeIn 0.2s ease-out both;
 }
@@ -530,7 +533,7 @@
   font-size: 22px;
   padding: 8px 14px;
   outline: none;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
   transition: border-color 0.15s;
 }
 
@@ -555,8 +558,14 @@
   flex-shrink: 0;
 }
 
-.dialog-send:hover:not(:disabled) { filter: brightness(1.2); }
-.dialog-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.dialog-send:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+.dialog-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .dialog-close {
   position: absolute;
@@ -626,7 +635,7 @@
   padding: 16px;
   background: #3e2723;
   border: 4px solid #5d4037;
-  box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
 }
 
 .inventory-item strong {
@@ -773,7 +782,7 @@
   /* Acorn Shape */
   clip-path: polygon(50% 0%, 80% 20%, 100% 40%, 90% 80%, 50% 100%, 10% 80%, 0% 40%, 20% 20%);
   border: 2px solid #3e2723;
-  box-shadow: 0 4px 4px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 4px rgba(0, 0, 0, 0.5);
 }
 
 .settings-footer {
@@ -792,7 +801,7 @@
   font-size: 22px;
   text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 6px 0 #2a1f18, 0 10px 20px rgba(0,0,0,0.6);
+  box-shadow: 0 6px 0 #2a1f18, 0 10px 20px rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   gap: 15px;
@@ -817,49 +826,124 @@
 }
 
 .custom-checkbox.checked::after {
-content: '✓';
-color: #d4a373;
-font-size: 20px;
+  content: '✓';
+  color: #d4a373;
+  font-size: 20px;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes scanline {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
+
 @keyframes hudSlideDown {
-  from { opacity: 0; transform: translateY(-28px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes hudSlideLeft {
-  from { opacity: 0; transform: translateX(-28px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
 @keyframes hudSlideRight {
-  from { opacity: 0; transform: translateX(28px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
 @keyframes hudSlideUp {
-  from { opacity: 0; transform: translateY(28px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes revealFade {
-  0%   { opacity: 1; }
-  70%  { opacity: 1; }
-  100% { opacity: 0; pointer-events: none; }
+  0% {
+    opacity: 1;
+  }
+
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
+
 @keyframes panelPop {
-  0%   { transform: translateY(22px) scale(0.97); }
-  60%  { transform: translateY(-3px) scale(1.005); }
-  100% { transform: translateY(0) scale(1); }
+  0% {
+    transform: translateY(22px) scale(0.97);
+  }
+
+  60% {
+    transform: translateY(-3px) scale(1.005);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
 }
+
 @keyframes slotPop {
-  0%   { opacity: 0; transform: scale(0.7); }
-  70%  { transform: scale(1.08); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  70% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .animate-scanline {
@@ -876,6 +960,286 @@ font-size: 20px;
   animation: revealFade 1.4s ease-out forwards;
 }
 
+.game-frame-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  image-rendering: pixelated;
+}
+
+/* ── UI.png-aligned HUD elements ─────────────────────── */
+
+.ui-portrait {
+  position: fixed;
+  left: 5.5%;
+  top: 8.5%;
+  height: 15.5%;
+  z-index: 40;
+  /* On top of UI (35) */
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  /* rough match for UI frame */
+}
+
+.ui-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.ui-hp-section {
+  position: fixed;
+  left: 15%;
+  top: 6.75%;
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5vh;
+  width: 14.5%;
+}
+
+.ui-char-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(7px, 0.9vw, 13px);
+  color: #ffe0a0;
+  text-shadow: 1px 1px 0 #3a2000;
+  margin-bottom: 0.3vh;
+  margin-left: 10%;
+}
+
+.ui-hp-bar {
+  height: 2.6vh;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(90, 50, 30, 0.6);
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.ui-hp-bar--health {
+  width: 100%;
+}
+
+.ui-hp-bar--stamina {
+  width: 80%;
+  height: 1.9vh;
+  margin-top: -3px;
+  margin-left: 6%;
+}
+
+.ui-hp-fill {
+  height: 100%;
+  background: linear-gradient(180deg, #7a1010 0%, #c42020 50%, #7a1010 100%);
+  transition: width 0.3s ease-out;
+}
+
+.ui-hp-fill--secondary {
+  width: 22% !important;
+  height: 1.8vh;
+  background: linear-gradient(180deg, #10407a 0%, #1560c4 50%, #10407a 100%);
+}
+
+.ui-gold {
+  position: fixed;
+  left: 10%;
+  top: 30.5%;
+  z-index: 40;
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(8px, 0.85vw, 13px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.8));
+}
+
+.ui-story-log {
+  position: fixed;
+  left: 2.8%;
+  top: 33%;
+  width: 24%;
+  z-index: 35;
+  color: #c49060;
+  font-size: clamp(9px, 0.9vw, 13px);
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.ui-story-log p {
+  margin: 0 0 0.6vh;
+  opacity: 0.85;
+}
+
+.ui-action-buttons {
+  display: none !important;
+  position: fixed;
+  right: 1%;
+  top: 7%;
+  width: 13.5%;
+  height: 19%;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5vw;
+  padding: 0 0.4vw;
+  pointer-events: auto;
+}
+
+.ui-icon-btn {
+  width: clamp(28px, 3.8vw, 52px);
+  height: clamp(28px, 3.8vw, 52px);
+  background: transparent;
+  border: none;
+  color: #ffe0a0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.15s, transform 0.1s;
+  filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+.ui-icon-btn:hover {
+  filter: brightness(1.5) drop-shadow(0 0 6px rgba(255, 220, 120, 0.5));
+  transform: scale(1.12);
+}
+
+.ui-icon-btn:active {
+  transform: scale(0.93);
+}
+
+.ui-hotbar {
+  position: fixed;
+  left: 19.5%;
+  right: 20%;
+  bottom: 1.5%;
+  height: 13%;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.35%;
+  pointer-events: auto;
+  display: none !important;
+
+
+}
+
+.ui-slot {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #ffe0a0;
+  background: transparent;
+  position: relative;
+  cursor: default;
+}
+
+.ui-slot-icon {
+  font-size: clamp(14px, 2.3vw, 36px);
+  line-height: 1;
+  filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+.ui-slot-num {
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(6px, 0.65vw, 10px);
+  color: #7a6050;
+  font-family: 'Press Start 2P', monospace;
+  pointer-events: none;
+}
+
+.ui-slot.cursed .ui-slot-icon {
+  color: #d8b4fe;
+  filter: drop-shadow(0 0 5px rgba(168, 85, 247, 0.7));
+}
+
+/* ── HUD entrance animations for new ui elements ─────── */
+.ui-portrait,
+.ui-hp-section,
+.ui-gold {
+  animation: hudSlideDown 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ui-story-log {
+  animation: hudSlideLeft 0.55s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ui-action-buttons {
+  animation: hudSlideDown 0.5s 0.05s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ui-hotbar {
+  animation: hudSlideUp 0.55s 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ui-slot:nth-child(1) {
+  animation: slotPop 0.35s 0.25s ease-out both;
+}
+
+.ui-slot:nth-child(2) {
+  animation: slotPop 0.35s 0.28s ease-out both;
+}
+
+.ui-slot:nth-child(3) {
+  animation: slotPop 0.35s 0.31s ease-out both;
+}
+
+.ui-slot:nth-child(4) {
+  animation: slotPop 0.35s 0.34s ease-out both;
+}
+
+.ui-slot:nth-child(5) {
+  animation: slotPop 0.35s 0.37s ease-out both;
+}
+
+.ui-slot:nth-child(6) {
+  animation: slotPop 0.35s 0.40s ease-out both;
+}
+
+.ui-slot:nth-child(7) {
+  animation: slotPop 0.35s 0.43s ease-out both;
+}
+
+.ui-slot:nth-child(8) {
+  animation: slotPop 0.35s 0.46s ease-out both;
+}
+
+.ui-slot:nth-child(9) {
+  animation: slotPop 0.35s 0.49s ease-out both;
+}
+
+.ui-slot:nth-child(10) {
+  animation: slotPop 0.35s 0.52s ease-out both;
+}
+
+.game-container {
+  position: fixed;
+  top: 2.5rem;
+  bottom: 2.5rem;
+  left: calc(3.5vw - 0.5rem);
+  right: calc(3.5vw - 0.5rem);
+  z-index: 0;
+  background: #08060d;
+}
+
 /* ── HUD entrance animations ─────────────────────────── */
 .game-hud {
   animation: hudSlideDown 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -890,11 +1254,25 @@ font-size: 20px;
 }
 
 /* Stagger each inventory slot */
-.quick-inventory .slot:nth-child(1) { animation: slotPop 0.35s 0.25s ease-out both; }
-.quick-inventory .slot:nth-child(2) { animation: slotPop 0.35s 0.32s ease-out both; }
-.quick-inventory .slot:nth-child(3) { animation: slotPop 0.35s 0.39s ease-out both; }
-.quick-inventory .slot:nth-child(4) { animation: slotPop 0.35s 0.46s ease-out both; }
-.quick-inventory .gold            { animation: slotPop 0.35s 0.53s ease-out both; }
+.quick-inventory .slot:nth-child(1) {
+  animation: slotPop 0.35s 0.25s ease-out both;
+}
+
+.quick-inventory .slot:nth-child(2) {
+  animation: slotPop 0.35s 0.32s ease-out both;
+}
+
+.quick-inventory .slot:nth-child(3) {
+  animation: slotPop 0.35s 0.39s ease-out both;
+}
+
+.quick-inventory .slot:nth-child(4) {
+  animation: slotPop 0.35s 0.46s ease-out both;
+}
+
+.quick-inventory .gold {
+  animation: slotPop 0.35s 0.53s ease-out both;
+}
 
 /* ── Dialog / inventory / combat panel entrance ──────── */
 .dialog-panel,
