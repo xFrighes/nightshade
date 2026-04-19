@@ -67,7 +67,15 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg_escape', '/bg_escape.png');
     this.load.image('bg_city', '/bg_city.png');
     this.load.image('bg_underground', '/bg_underground.png');
-    this.load.atlas('player_anim', '/player_sheet.png', '/player_sheet.json');
+    
+    // Use the NEW NORMALIZED frames (800x800)
+    const d = '/elara_normalized/';
+    this.load.image('n_idle', d + 'new_idle_1.png');
+    this.load.image('n_walk_1', d + 'new_walk_1.png');
+    this.load.image('n_walk_2', d + 'new_walk_2.png');
+    this.load.image('n_walk_3', d + 'new_walk_3.png');
+    this.load.image('n_walk_4', d + 'new_walk_4.png');
+    this.load.image('n_jump', d + 'new_action_1.png');
   }
 
   private getWorldHeight() {
@@ -85,33 +93,48 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, 2200, worldHeight);
     this.cameras.main.setBounds(0, 0, 2200, worldHeight);
 
-    if (!this.anims.exists('player-idle')) {
-      this.anims.create({
-        key: 'player-idle',
-        frames: this.anims.generateFrameNames('player_anim', { prefix: 'idle_', start: 0, end: 3 }),
-        frameRate: 6,
-        repeat: -1,
-      });
-    }
+    // Re-create animations with new 800x800 assets
+    if (this.anims.exists('player-idle')) this.anims.remove('player-idle');
+    if (this.anims.exists('player-walk')) this.anims.remove('player-walk');
+    if (this.anims.exists('player-jump')) this.anims.remove('player-jump');
 
-    if (!this.anims.exists('player-walk')) {
-      this.anims.create({
-        key: 'player-walk',
-        frames: this.anims.generateFrameNames('player_anim', { prefix: 'walk_', start: 0, end: 4 }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    this.anims.create({
+      key: 'player-idle',
+      frames: [{ key: 'n_idle' }],
+      frameRate: 1,
+      repeat: -1
+    });
 
-    this.player = this.physics.add.sprite(130, this.getBaseY(), 'player_anim');
+    this.anims.create({
+      key: 'player-walk',
+      frames: [
+        { key: 'n_walk_1' },
+        { key: 'n_walk_2' },
+        { key: 'n_walk_3' },
+        { key: 'n_walk_4' }
+      ],
+      frameRate: 10,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'player-jump',
+      frames: [{ key: 'n_jump' }],
+      frameRate: 1,
+      repeat: -1
+    });
+
+    this.player = this.physics.add.sprite(130, this.getBaseY(), 'n_idle');
     this.player.setOrigin(0.5, 1);
-    this.player.setScale((110 / 500) * 2.4);
+    this.player.setScale(0.45); // Adjusted scale for 800x800 frames
     this.player.setCollideWorldBounds(true);
-    this.player.play('player-idle');
-
+    
+    // STABLE HITBOX - 800x800 frame with origin (0.5, 1)
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    body.setSize(80, 200);
-    body.setOffset(80, 300);
+    body.setSize(120, 680); // Full character height (approx 675)
+    // Centered on 800px frame: (800-120)/2 = 340. 
+    // Anchored at bottom, so Y offset = 800 - 680 = 120.
+    body.setOffset(340, 120); 
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setFollowOffset(0, 80);
@@ -149,17 +172,10 @@ export class GameScene extends Phaser.Scene {
 
   update() {
     if (!this.player?.body) return;
-
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     
-    // Dynamically adjust offset to keep feet aligned with the bottom of the frame
-    const frameWidth = this.player.frame.realWidth;
-    const frameHeight = this.player.frame.realHeight;
-    body.setSize(80, 200);
-    body.setOffset((frameWidth - 80) / 2, frameHeight - 200);
-
     const speed = this.currentState?.flags.runeTaken ? 285 : 245;
-    const jump = this.currentState?.flags.runeTaken ? 610 : 470;
+    const jumpVelocity = this.currentState?.flags.runeTaken ? 610 : 470;
     const left = this.cursors.left.isDown || this.wasd.A.isDown || this.virtualInput.left;
     const right = this.cursors.right.isDown || this.wasd.D.isDown || this.virtualInput.right;
     const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasd.W) || this.virtualInput.jump;
@@ -175,11 +191,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (jumpPressed && body.blocked.down) {
-      body.setVelocityY(-jump);
+      body.setVelocityY(-jumpVelocity);
       this.virtualInput.jump = false;
     }
 
-    this.player.play(left || right ? 'player-walk' : 'player-idle', true);
+    if (!body.blocked.down) {
+      this.player.play('player-jump', true);
+    } else if (Math.abs(body.velocity.x) > 0.1) {
+      this.player.play('player-walk', true);
+    } else {
+      this.player.play('player-idle', true);
+    }
+
     this.player.setDepth(this.player.y);
     this.updateNearestInteractable();
 
@@ -226,7 +249,6 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(palette.sky);
     
     const bg = this.add.image(0, 0, SCENE_BACKGROUNDS[state.scene]).setOrigin(0, 0);
-    // Required size for scroll factor 0.18 to cover the screen
     const reqWidth = width + (worldWidth - width) * 0.18;
     const reqHeight = height + 400 * 0.18;
     const bgScale = Math.max(reqWidth / bg.width, reqHeight / bg.height);
@@ -236,7 +258,6 @@ export class GameScene extends Phaser.Scene {
     bg.setAlpha(state.flags.runeTaken ? 0.74 : 0.92);
 
     this.drawAtmosphere(state.scene, palette);
-    // Transparent floor platform, raised up
     this.addPlatform(1100, baseY + 60, 2200, 120, 0x000000, 0);
 
     if (state.scene === 'cell') this.buildCell(baseY, palette);
@@ -455,7 +476,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawBars(x: number, y: number) {
-    this.add.rectangle(x, y, 300, 210, 0x111827, 0.35).setStrokeStyle(4, 0x9ca3af, 0.55);
+    this.add.rectangle(x, y, 300, 210, 0x111827, 0x111827, 0.35).setStrokeStyle(4, 0x9ca3af, 0.55);
     for (let i = -4; i <= 4; i += 1) {
       this.add.rectangle(x + i * 30, y, 8, 210, 0x9ca3af, 0.5);
     }
