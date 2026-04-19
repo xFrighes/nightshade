@@ -68,14 +68,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg_city', '/bg_city.png');
     this.load.image('bg_underground', '/bg_underground.png');
     
-    // Use the NEW NORMALIZED frames (800x800)
-    const d = '/elara_normalized/';
-    this.load.image('n_idle', d + 'new_idle_1.png');
-    this.load.image('n_walk_1', d + 'new_walk_1.png');
-    this.load.image('n_walk_2', d + 'new_walk_2.png');
-    this.load.image('n_walk_3', d + 'new_walk_3.png');
-    this.load.image('n_walk_4', d + 'new_walk_4.png');
-    this.load.image('n_jump', d + 'new_action_1.png');
+    // Load the uniform 800x800 spritesheet
+    this.load.spritesheet('player_elara', '/elara.png', { frameWidth: 800, frameHeight: 800 });
   }
 
   private getWorldHeight() {
@@ -93,47 +87,41 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, 2200, worldHeight);
     this.cameras.main.setBounds(0, 0, 2200, worldHeight);
 
-    // Re-create animations with new 800x800 assets
     if (this.anims.exists('player-idle')) this.anims.remove('player-idle');
     if (this.anims.exists('player-walk')) this.anims.remove('player-walk');
     if (this.anims.exists('player-jump')) this.anims.remove('player-jump');
 
+    // Idle frames: 4-7 in the uniform sheet
     this.anims.create({
       key: 'player-idle',
-      frames: [{ key: 'n_idle' }],
+      frames: this.anims.generateFrameNumbers('player_elara', { start: 4, end: 4 }),
       frameRate: 1,
       repeat: -1
     });
 
+    // Walk frames: 0-3 in the uniform sheet
     this.anims.create({
       key: 'player-walk',
-      frames: [
-        { key: 'n_walk_1' },
-        { key: 'n_walk_2' },
-        { key: 'n_walk_3' },
-        { key: 'n_walk_4' }
-      ],
+      frames: this.anims.generateFrameNumbers('player_elara', { start: 0, end: 3 }),
       frameRate: 10,
       repeat: -1
     });
 
+    // Jump frame: 8 in the uniform sheet
     this.anims.create({
       key: 'player-jump',
-      frames: [{ key: 'n_jump' }],
+      frames: this.anims.generateFrameNumbers('player_elara', { start: 8, end: 8 }),
       frameRate: 1,
       repeat: -1
     });
 
-    this.player = this.physics.add.sprite(130, this.getBaseY(), 'n_idle');
+    this.player = this.physics.add.sprite(130, this.getBaseY(), 'player_elara', 4);
     this.player.setOrigin(0.5, 1);
-    this.player.setScale(0.45); // Adjusted scale for 800x800 frames
+    this.player.setScale(0.45); 
     this.player.setCollideWorldBounds(true);
     
-    // STABLE HITBOX - 800x800 frame with origin (0.5, 1)
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    body.setSize(120, 680); // Full character height (approx 675)
-    // Centered on 800px frame: (800-120)/2 = 340. 
-    // Anchored at bottom, so Y offset = 800 - 680 = 120.
+    body.setSize(120, 680); 
     body.setOffset(340, 120); 
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
@@ -476,7 +464,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawBars(x: number, y: number) {
-    this.add.rectangle(x, y, 300, 210, 0x111827, 0x111827, 0.35).setStrokeStyle(4, 0x9ca3af, 0.55);
+    this.add.rectangle(x, y, 300, 210, 0x111827, 0.35).setStrokeStyle(4, 0x9ca3af, 0.55);
     for (let i = -4; i <= 4; i += 1) {
       this.add.rectangle(x + i * 30, y, 8, 210, 0x9ca3af, 0.5);
     }
