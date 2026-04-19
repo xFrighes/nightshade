@@ -104,6 +104,32 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const enterFullscreen = () => {
+    const docEl = document.documentElement as any;
+    const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+    const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).msFullscreenElement;
+
+    if (!fullscreenElement && request) {
+      request.call(docEl).catch((err: any) => {
+        console.warn(`Error attempting to enable fullscreen mode: ${err.message}`);
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handleInitialInteraction = () => {
+      enterFullscreen();
+      document.removeEventListener('mousedown', handleInitialInteraction);
+      document.removeEventListener('keydown', handleInitialInteraction);
+    };
+    document.addEventListener('mousedown', handleInitialInteraction);
+    document.addEventListener('keydown', handleInitialInteraction);
+    return () => {
+      document.removeEventListener('mousedown', handleInitialInteraction);
+      document.removeEventListener('keydown', handleInitialInteraction);
+    };
+  }, []);
+
   const inventory = useMemo(() => story.inventory.map((id) => STORY_ITEMS[id]), [story.inventory]);
 
   const updateStory = (updater: (state: StoryState) => StoryState) => {
@@ -573,12 +599,14 @@ const App: React.FC = () => {
   };
 
   const handleStartGame = () => {
+    enterFullscreen();
     resetGame();
     setIsGameStarted(true);
     setIsLoading(true);
   };
 
   const handleLoadGame = () => {
+    enterFullscreen();
     setIsGameStarted(true);
     setIsLoading(true);
   };
