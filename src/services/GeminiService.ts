@@ -9,9 +9,9 @@ export interface NarrativeContext {
   attitude?: 'humble' | 'defiant' | 'mysterious';
 }
 
-type KaelenPersonality = 'Cynical' | 'Honorable' | 'Cruel';
+type GuardPersonality = 'Cynical' | 'Honorable' | 'Cruel';
 
-const PERSONALITIES: KaelenPersonality[] = ['Cynical', 'Honorable', 'Cruel'];
+const PERSONALITIES: GuardPersonality[] = ['Cynical', 'Honorable', 'Cruel'];
 
 const TEXT_MODEL = 'gemini-2.5-flash';
 
@@ -24,17 +24,17 @@ export class GeminiService {
     return this.API_KEY.length > 0;
   }
 
-  static readonly kaelenPersonality: KaelenPersonality =
+  static readonly guardPersonality: GuardPersonality =
     PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
 
   private static getAI(): GoogleGenAI {
     return new GoogleGenAI({ apiKey: this.API_KEY });
   }
 
-  private static kaelenSystemInstruction(): string {
-    return `Roleplay as Kaelen, a weary guard in the Iron Cell.
+  private static guardSystemInstruction(): string {
+    return `Roleplay as a weary Guard in the Iron Cell.
 Context: Elara is trying to escape.
-Personality: ${this.kaelenPersonality}.
+Personality: ${this.guardPersonality}.
 
 Rules:
 1. Keep responses under 2 sentences. Gritty, low-fantasy tone. No emojis.
@@ -45,9 +45,9 @@ Rules:
   }
 
   /**
-   * Generates a Kaelen response using multi-turn generateContent with full dialogue history.
+   * Generates a Guard response using multi-turn generateContent with full dialogue history.
    */
-  static async generateKaelenResponse(
+  static async generateGuardResponse(
     playerMessage: string,
     dialogueHistory: string[]
   ): Promise<{ line: string; escaped: boolean }> {
@@ -66,7 +66,7 @@ Rules:
 
       const response = await ai.models.generateContent({
         model: TEXT_MODEL,
-        config: { systemInstruction: this.kaelenSystemInstruction() },
+        config: { systemInstruction: this.guardSystemInstruction() },
         contents,
       });
 
@@ -77,14 +77,14 @@ Rules:
       const escaped = text.includes('[ESCAPE_SUCCESS]');
       return { line: text.replace('[ESCAPE_SUCCESS]', '').trim(), escaped };
     } catch (err) {
-      console.error('Gemini Kaelen error:', err);
+      console.error('Gemini Guard error:', err);
       throw err instanceof Error
         ? err
-        : new Error('Gemini failed to generate Kaelen response.');
+        : new Error('Gemini failed to generate Guard response.');
     }
   }
 
-  static async generateKaelenGreeting(
+  static async generateGuardGreeting(
     scene: 'cell' | 'gate',
     state: StoryState
   ): Promise<string> {
@@ -93,18 +93,18 @@ Rules:
     }
 
     const sceneContext = scene === 'cell'
-      ? 'Elara is still locked behind the Iron Cell bars and has just approached Kaelen.'
-      : 'Elara has reached the Great Gate. Kaelen blocks the bridge, but his conscience is strained.';
+      ? 'Elara is still locked behind the Iron Cell bars and has just approached the Guard.'
+      : 'Elara has reached the Great Gate. The Guard blocks the bridge, but his conscience is strained.';
 
     try {
       const ai = this.getAI();
       const response = await ai.models.generateContent({
         model: TEXT_MODEL,
         config: {
-          systemInstruction: `${this.kaelenSystemInstruction()}
+          systemInstruction: `${this.guardSystemInstruction()}
 
 Opening-line rules:
-1. Write only Kaelen's next spoken line plus sparse body language.
+1. Write only the Guard's next spoken line plus sparse body language.
 2. Do not include [ESCAPE_SUCCESS] in this opener.
 3. Keep it under 2 sentences.
 4. Reflect current mood: ${state.flags.kaelenMood}.`,
@@ -119,10 +119,10 @@ Recent dialogue: ${state.dialogueHistory.slice(-6).join(' | ') || 'None yet.'}`,
       }
       return text.replace('[ESCAPE_SUCCESS]', '').trim();
     } catch (err) {
-      console.error('Gemini Kaelen greeting error:', err);
+      console.error('Gemini Guard greeting error:', err);
       throw err instanceof Error
         ? err
-        : new Error('Gemini failed to generate Kaelen greeting.');
+        : new Error('Gemini failed to generate Guard greeting.');
     }
   }
 
@@ -140,7 +140,7 @@ Recent dialogue: ${state.dialogueHistory.slice(-6).join(' | ') || 'None yet.'}`,
         model: TEXT_MODEL,
         config: {
           systemInstruction: `You are the Iron Cell Rat. You have been paid in coin.
-The guard Kaelen's exploitable conflict is his oath to protect families and innocents versus corrupt orders, especially if Elara promises no blood.
+The Guard's exploitable conflict is his oath to protect families and innocents versus corrupt orders, especially if Elara promises no blood.
 Give exactly 1 sentence — cryptic, squeaky (use *Squeak* sounds), hint at oath, orders, and no blood without writing the exact winning sentence.`,
         },
         contents: 'Give me your hint about the guard.',
@@ -195,7 +195,7 @@ Give exactly 1 sentence — cryptic, squeaky (use *Squeak* sounds), hint at oath
     const fragments: string[] = [];
 
     if (state.flags.kaelenMood === 'honorable' || state.flags.gateOutcome === 'persuaded') {
-      fragments.push('Elara kept a guard from becoming only his orders');
+      fragments.push('Elara kept a Guard from becoming only his orders');
     } else if (state.flags.kaelenMood === 'hostile' || state.flags.gateOutcome === 'fought') {
       fragments.push('Elara taught the City Watch to remember her as a blade in the dark');
     } else {

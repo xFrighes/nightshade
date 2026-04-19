@@ -37,7 +37,7 @@ export const DialogBox: React.FC<DialogBoxProps> = ({ npc, onClose }) => {
         { 
           label: "I seek the Nightshade contact.", 
           action: () => {
-            setText("Kaelen: The contact? You're looking for Silas. He's further down the street. Don't tell him I sent you.");
+            setText("Guard: The contact? You're looking for Silas. He's further down the street. Don't tell him I sent you.");
             gameStore.updateQuestStatus('meet_guide', 'completed');
             gameStore.addLog("Quest Completed: The Shadowy Guide", 'reward');
             gameStore.addItem({ id: 'city_pass', name: 'Rusted City Pass', description: 'Allows passage to the inner slums.', icon: '🎫', count: 1 });

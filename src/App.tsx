@@ -38,19 +38,19 @@ type DialogState = {
 };
 
 type CombatState = {
-  kaelen: number;
-  kaelenMax: number;
+  guard: number;
+  guardMax: number;
   elara: number;
   elaraMax: number;
   message: string;
 };
 
-const DIFFICULTY_RULES: Record<string, { kaelenHealth: number; strikeDamage: number; counterDamage: number; guardHeal: number }> = {
-  Story: { kaelenHealth: 4, strikeDamage: 3, counterDamage: 0, guardHeal: 2 },
-  Easy: { kaelenHealth: 5, strikeDamage: 3, counterDamage: 1, guardHeal: 2 },
-  Normal: { kaelenHealth: 6, strikeDamage: 2, counterDamage: 1, guardHeal: 1 },
-  Hard: { kaelenHealth: 8, strikeDamage: 2, counterDamage: 2, guardHeal: 1 },
-  Nightmare: { kaelenHealth: 10, strikeDamage: 1, counterDamage: 2, guardHeal: 1 },
+const DIFFICULTY_RULES: Record<string, { guardHealth: number; strikeDamage: number; counterDamage: number; guardHeal: number }> = {
+  Story: { guardHealth: 4, strikeDamage: 3, counterDamage: 0, guardHeal: 2 },
+  Easy: { guardHealth: 5, strikeDamage: 3, counterDamage: 1, guardHeal: 2 },
+  Normal: { guardHealth: 6, strikeDamage: 2, counterDamage: 1, guardHeal: 1 },
+  Hard: { guardHealth: 8, strikeDamage: 2, counterDamage: 2, guardHeal: 1 },
+  Nightmare: { guardHealth: 10, strikeDamage: 1, counterDamage: 2, guardHeal: 1 },
 };
 
 const getDifficultyRules = (difficulty: string) => DIFFICULTY_RULES[difficulty] ?? DIFFICULTY_RULES.Normal;
@@ -72,18 +72,18 @@ const syncMusicPlayback = (audio: HTMLAudioElement, settings: SettingsState, sho
   });
 };
 
-const formatKaelenGeminiError = (err: unknown): string => {
+const formatGuardGeminiError = (err: unknown): string => {
   const message = err instanceof Error ? err.message : 'Gemini failed to answer.';
-  return `Gemini could not answer as Kaelen. ${message}`;
+  return `Gemini could not answer as the Guard. ${message}`;
 };
 
-const kaelenCellGreeting = 'Kaelen keeps one hand on the ring of keys. "Do not make me choose between orders and mercy tonight."';
+const guardCellGreeting = 'The Guard keeps one hand on the ring of keys. "Do not make me choose between orders and mercy tonight."';
 
-const kaelenGateGreeting = 'Kaelen blocks the bridge with his spear lowered but not leveled. "One more step and I have to become the kind of man this city pays me to be."';
+const guardGateGreeting = 'The Guard blocks the bridge with his spear lowered but not leveled. "One more step and I have to become the kind of man this city pays me to be."';
 
 const includesAny = (text: string, terms: string[]) => terms.some(term => text.includes(term));
 
-const scoresKaelenAppeal = (line: string, scene: 'cell' | 'gate'): boolean => {
+const scoresGuardAppeal = (line: string, scene: 'cell' | 'gate'): boolean => {
   const text = line.toLowerCase();
   const threatening = includesAny(text, ['kill', 'cut you', 'stab', 'die', 'move or', 'threat', 'burn you']);
   if (threatening) return false;
@@ -104,7 +104,7 @@ const scoresKaelenAppeal = (line: string, scene: 'cell' | 'gate'): boolean => {
   return score >= 2;
 };
 
-const getKaelenClue = (line: string, scene: 'cell' | 'gate', state: StoryState): string | null => {
+const getGuardClue = (line: string, scene: 'cell' | 'gate', state: StoryState): string | null => {
   const text = line.toLowerCase();
   const asksQuestion = text.includes('?') || includesAny(text, [
     'why', 'what', 'who', 'tell me', 'ask', 'know', 'want', 'fear', 'afraid',
@@ -115,12 +115,12 @@ const getKaelenClue = (line: string, scene: 'cell' | 'gate', state: StoryState):
   if (!asksQuestion) return null;
 
   if (includesAny(text, ['kill', 'cut you', 'stab', 'die', 'move or'])) {
-    return 'Kaelen closes his fist around the keys. "Threats make this simple. I know what to do with threats."';
+    return 'The Guard closes his fist around the keys. "Threats make this simple. I know what to do with threats."';
   }
 
   if (scene === 'cell') {
     if (includesAny(text, ['orders', 'order', 'captain', 'watch', 'who put me', 'why am i here'])) {
-      return 'Kaelen looks toward the corridor. "Orders came stamped and sealed. They did not say whether obeying them still made me honorable."';
+      return 'The Guard looks toward the corridor. "Orders came stamped and sealed. They did not say whether obeying them still made me honorable."';
     }
     if (includesAny(text, ['oath', 'honor', 'honour', 'duty'])) {
       return '"My oath was to keep families safe," he says. "Not to make cages look righteous."';
@@ -129,30 +129,30 @@ const getKaelenClue = (line: string, scene: 'cell' | 'gate', state: StoryState):
       return 'His jaw tightens. "Do not speak lightly of families. That was the word that made me take the badge."';
     }
     if (includesAny(text, ['mercy', 'conscience', 'regret', 'afraid', 'fear'])) {
-      return '"Mercy is not a soft word here," Kaelen says. "It costs a man his post, sometimes his name."';
+      return '"Mercy is not a soft word here," the Guard says. "It costs a man his post, sometimes his name."';
     }
-    return 'Kaelen listens despite himself. "If you want the key, do not flatter me. Show me which oath I am breaking by keeping you here."';
+    return 'The Guard listens despite himself. "If you want the key, do not flatter me. Show me which oath I am breaking by keeping you here."';
   }
 
   if (includesAny(text, ['silas', 'pass', 'coin', 'debt', 'selling', 'broker'])) {
-    return '"Silas sells papers while the Watch pretends the gate is pure," Kaelen says. "Do not ask me to admire clean rules in a dirty city."';
+    return '"Silas sells papers while the Watch pretends the gate is pure," the Guard says. "Do not ask me to admire clean rules in a dirty city."';
   }
   if (includesAny(text, ['rune', 'curse', 'darkness', 'burn', 'city'])) {
-    return 'Kaelen glances back at the city smoke. "The Darkness grows while we arrest the desperate and salute the paid."';
+    return 'The Guard glances back at the city smoke. "The Darkness grows while we arrest the desperate and salute the paid."';
   }
   if (includesAny(text, ['oath', 'honor', 'honour', 'duty', 'orders', 'order', 'watch'])) {
     return '"If I obey the order, I keep the bridge," he says. "If I obey the oath, I may have to open it."';
   }
   if (includesAny(text, ['family', 'families', 'child', 'children', 'people', 'innocent', 'protect'])) {
-    return '"The Watch was meant to protect people," Kaelen says. "Some nights I can still remember that."';
+    return '"The Watch was meant to protect people," the Guard says. "Some nights I can still remember that."';
   }
   if (includesAny(text, ['mercy', 'conscience', 'regret', 'afraid', 'fear'])) {
     return '"I am afraid of making the wrong mercy," he says. "Blood follows easy choices."';
   }
   if (state.flags.kaelenMood === 'honorable' || state.flags.kaelenMood === 'merciful') {
-    return 'Kaelen recognizes you. "You already know where the crack is. Do not waste it on cleverness."';
+    return 'The Guard recognizes you. "You already know where the crack is. Do not waste it on cleverness."';
   }
-  return 'Kaelen keeps the spear low. "Ask me about the order, the oath, or the city. Those are the only things left arguing in me."';
+  return 'The Guard keeps the spear low. "Ask me about the order, the oath, or the city. Those are the only things left arguing in me."';
 };
 
 const App: React.FC = () => {
@@ -258,7 +258,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (settings.gameplay.autoSave) {
-      localStorage.setItem('shadow_toll_story', JSON.stringify(story));
+      localStorage.setItem('nightshade_story', JSON.stringify(story));
     }
   }, [story, settings.gameplay.autoSave]);
 
@@ -268,7 +268,7 @@ const App: React.FC = () => {
     if (story.scene !== 'cell' || story.dialogueHistory.length > 0) return;
     const timer = setTimeout(() => {
       setOpeningShown(true);
-      const text = 'Cold stone. Iron bars. My breath fogs the dark. Nothing in my hands.\n\nKaelen is on watch through the bars. There has to be a way out of here.';
+      const text = 'Cold stone. Iron bars. My breath fogs the dark. Nothing in my hands.\n\nGuard is on watch through the bars. There has to be a way out of here.';
       updateStory(state => ({
         ...state,
         fullHistory: [...(state.fullHistory || []), {
@@ -394,12 +394,12 @@ const App: React.FC = () => {
     if (action.type !== 'interact') return;
 
     const handlers: Record<string, () => void> = {
-      kaelen: openKaelenCell,
+      guard: openGuardCell,
       rat: interactRat,
       cell_exit: () => {
         setDialog({
           speaker: 'SYSTEM',
-          text: 'CONGRATULATIONS! You have successfully escaped the Iron Cell. This concludes the Alpha preview of Shadow\'s Toll.',
+          text: 'CONGRATULATIONS! You have successfully escaped the Iron Cell. This concludes the Alpha preview of Nightshade.',
           options: [{ 
             label: 'RETURN TO MENU', 
             action: () => {
@@ -412,8 +412,8 @@ const App: React.FC = () => {
       silas: openSilas,
       market_exit: () => goToScene('cathedral', 'Gate pass in hand, Elara climbs into the Cathedral Ward.'),
       envoy: openEnvoy,
-      cathedral_exit: () => goToScene('gate', 'The fortified bridge rises ahead. Kaelen waits under torchlight.'),
-      kaelen_gate: openGateKaelen,
+      cathedral_exit: () => goToScene('gate', 'The fortified bridge rises ahead. Guard waits under torchlight.'),
+      guard_gate: openGateGuard,
       gate_lock: useGateKey,
       great_gate: useGreatGate,
       envoy_final: openFinalEnvoy,
@@ -426,7 +426,7 @@ const App: React.FC = () => {
     if (story.flags.ratPaid) {
       setDialog({
         speaker: 'Guard-rat',
-        text: 'The rat has gone. Only scratch marks and the smell of coin remain.',
+        text: 'The rat has gone. Only the faint smell of coin remains.',
         options: [{ label: 'Step away', action: () => setDialog(null) }],
       });
       return;
@@ -436,18 +436,6 @@ const App: React.FC = () => {
       speaker: 'Guard-rat',
       text: 'The rat fixes you with one glassy eye. It knows something. It wants coin.',
       options: [
-        {
-          label: 'Study its scratch marks',
-          action: () => {
-            const hint = 'The rat has scratched three crooked words into the grime: OATH, ORDERS, BLOOD. The first is circled. The last is crossed out.';
-            updateStory((state) => addLog(state, `Rat clue: ${hint}`));
-            setDialog({
-              speaker: 'Guard-rat',
-              text: `*Squeak*... ${hint}`,
-              options: [{ label: 'Remember the clue', action: () => setDialog(null) }],
-            });
-          },
-        },
         {
           label: walletAddress ? 'Slip it 0.01 SOL (Devnet)' : 'Connect wallet to bribe the rat',
           disabled: isAiLoading,
@@ -504,45 +492,45 @@ const App: React.FC = () => {
     });
   };
 
-  function grantCellKey(choice: string, kaelenLine: string) {
+  function grantCellKey(choice: string, guardLine: string) {
     updateStory(state => {
       const next = recordChoice({
         ...state,
         flags: { ...state.flags, kaelenMood: 'honorable' },
       }, choice);
       return addItem(addLog(
-        recordDialogueLine(next, 'Kaelen', kaelenLine),
-        'Kaelen chooses mercy and passes over the Rusted Key.',
+        recordDialogueLine(next, 'Guard', guardLine),
+        'Guard chooses mercy and passes over the Rusted Key.',
       ), 'rusted_key');
     });
     setDialog({
-      speaker: 'Kaelen',
-      text: kaelenLine,
+      speaker: 'Guard',
+      text: guardLine,
       options: [{ label: 'Take the key', action: () => setDialog(null) }],
     });
   }
 
-  async function handleCellKaelenInput(playerLine: string) {
+  async function handleCellGuardInput(playerLine: string) {
     setIsAiLoading(true);
     setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
     try {
-      if (scoresKaelenAppeal(playerLine, 'cell')) {
+      if (scoresGuardAppeal(playerLine, 'cell')) {
         grantCellKey(
           playerLine,
-          'Kaelen studies you for a long breath, then slides the key through the bars. "That is the first honest thing this prison has heard all week."',
+          'Guard studies you for a long breath, then slides the key through the bars. "That is the first honest thing this prison has heard all week."',
         );
         return;
       }
 
-      const clue = getKaelenClue(playerLine, 'cell', storyRef.current);
+      const clue = getGuardClue(playerLine, 'cell', storyRef.current);
       if (clue) {
-        updateStory(state => recordDialogueLine(recordChoice(state, playerLine), 'Kaelen', clue));
+        updateStory(state => recordDialogueLine(recordChoice(state, playerLine), 'Guard', clue));
         setDialog({
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: clue,
           options: [{ label: 'Back away', action: () => setDialog(null) }],
           inputMode: true,
-          onInput: handleCellKaelenInput,
+          onInput: handleCellGuardInput,
         });
         return;
       }
@@ -550,24 +538,24 @@ const App: React.FC = () => {
       if (!GeminiService.isConfigured()) {
         updateStory(state => recordChoice(state, playerLine));
         setDialog({
-          speaker: 'Kaelen',
-          text: 'Kaelen does not move for that. "Ask what my orders cost, or what my oath was meant to protect. Then choose your words."',
+          speaker: 'Guard',
+          text: 'Guard does not move for that. "Ask what my orders cost, or what my oath was meant to protect. Then choose your words."',
           options: [{ label: 'Back away', action: () => setDialog(null) }],
           inputMode: true,
-          onInput: handleCellKaelenInput,
+          onInput: handleCellGuardInput,
         });
         return;
       }
 
-      const { line, escaped } = await GeminiService.generateKaelenResponse(
+      const { line, escaped } = await GeminiService.generateGuardResponse(
         playerLine, storyRef.current.dialogueHistory,
       );
       updateStory(state => recordChoice(state, playerLine));
-      const npcLine = line || "Kaelen slides a key under the bars without a word.";
+      const npcLine = line || "Guard slides a key under the bars without a word.";
       updateStory(state => ({
         ...state,
         fullHistory: [...(state.fullHistory || []), {
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: npcLine,
           timestamp: Date.now(),
           type: 'dialogue'
@@ -577,75 +565,75 @@ const App: React.FC = () => {
       if (escaped) {
         updateStory(state => addItem(addLog({
           ...state, flags: { ...state.flags, kaelenMood: 'merciful' },
-        }, 'Kaelen slides the key under the bars.'), 'rusted_key'));
+        }, 'Guard slides the key under the bars.'), 'rusted_key'));
         setDialog({
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: npcLine,
           options: [{ label: 'Take the key', action: () => setDialog(null) }],
         });
       } else {
         updateStory(state => ({ ...state, flags: { ...state.flags, kaelenMood: 'hostile' } }));
         setDialog({
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: line,
           options: [{ label: 'Walk away', action: () => setDialog(null) }],
           inputMode: true,
-          onInput: handleCellKaelenInput,
+          onInput: handleCellGuardInput,
         });
       }
     } catch (err: unknown) {
       setDialog({
-        speaker: 'Kaelen',
-        text: `${kaelenCellGreeting} (${formatKaelenGeminiError(err)})`,
+        speaker: 'Guard',
+        text: `${guardCellGreeting} (${formatGuardGeminiError(err)})`,
         options: [{ label: 'Step back', action: () => setDialog(null) }],
         inputMode: true,
-        onInput: handleCellKaelenInput,
+        onInput: handleCellGuardInput,
       });
     } finally {
       setIsAiLoading(false);
     }
   }
 
-  const openKaelenCell = async () => {
+  const openGuardCell = async () => {
     if (!GeminiService.isConfigured()) {
       setDialog({
-        speaker: 'Kaelen',
-        text: kaelenCellGreeting,
+        speaker: 'Guard',
+        text: guardCellGreeting,
         options: [{ label: 'Back away', action: () => setDialog(null) }],
         inputMode: true,
-        onInput: handleCellKaelenInput,
+        onInput: handleCellGuardInput,
       });
       return;
     }
 
     setIsAiLoading(true);
-    setDialog({ speaker: 'Kaelen', text: '...', options: [] });
+    setDialog({ speaker: 'Guard', text: '...', options: [] });
 
     try {
-      const line = await GeminiService.generateKaelenGreeting('cell', storyRef.current);
+      const line = await GeminiService.generateGuardGreeting('cell', storyRef.current);
       updateStory(state => ({
         ...state,
         fullHistory: [...(state.fullHistory || []), {
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: line,
           timestamp: Date.now(),
           type: 'dialogue'
         }]
       }));
       setDialog({
-        speaker: 'Kaelen',
+        speaker: 'Guard',
         text: line,
         options: [{ label: 'Back away', action: () => setDialog(null) }],
         inputMode: true,
-        onInput: handleCellKaelenInput,
+        onInput: handleCellGuardInput,
       });
     } catch (err: unknown) {
       setDialog({
-        speaker: 'Kaelen',
-        text: `${kaelenCellGreeting} (${formatKaelenGeminiError(err)})`,
+        speaker: 'Guard',
+        text: `${guardCellGreeting} (${formatGuardGeminiError(err)})`,
         options: [{ label: 'Back away', action: () => setDialog(null) }],
         inputMode: true,
-        onInput: handleCellKaelenInput,
+        onInput: handleCellGuardInput,
       });
     } finally {
       setIsAiLoading(false);
@@ -734,42 +722,42 @@ const App: React.FC = () => {
     });
   };
 
-  function persuadeGateOpen(choice: string, kaelenLine: string) {
+  function persuadeGateOpen(choice: string, guardLine: string) {
     updateStory(state => {
       const next = recordChoice({
         ...state,
         flags: { ...state.flags, kaelenMood: 'merciful', gateOutcome: 'persuaded' },
       }, choice);
-      return addLog(recordDialogueLine(next, 'Kaelen', kaelenLine), 'Kaelen lowers his spear and lets Elara pass.');
+      return addLog(recordDialogueLine(next, 'Guard', guardLine), 'Guard lowers his spear and lets Elara pass.');
     });
     setDialog({
-      speaker: 'Kaelen',
-      text: kaelenLine,
-      options: [{ label: 'Walk through the gate', action: () => goToScene('outskirts', 'Kaelen turns his back on the order and opens the way.') }],
+      speaker: 'Guard',
+      text: guardLine,
+      options: [{ label: 'Walk through the gate', action: () => goToScene('outskirts', 'Guard turns his back on the order and opens the way.') }],
     });
   }
 
-  async function handleGateKaelenInput(playerLine: string) {
+  async function handleGateGuardInput(playerLine: string) {
     setIsAiLoading(true);
     setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
     try {
-      if (scoresKaelenAppeal(playerLine, 'gate')) {
+      if (scoresGuardAppeal(playerLine, 'gate')) {
         persuadeGateOpen(
           playerLine,
-          'Kaelen hears the shape of the choice before he answers. The spear lowers. "No blood. No names. Run."',
+          'Guard hears the shape of the choice before he answers. The spear lowers. "No blood. No names. Run."',
         );
         return;
       }
 
-      const clue = getKaelenClue(playerLine, 'gate', storyRef.current);
+      const clue = getGuardClue(playerLine, 'gate', storyRef.current);
       if (clue) {
-        updateStory(state => recordDialogueLine(recordChoice(state, playerLine), 'Kaelen', clue));
+        updateStory(state => recordDialogueLine(recordChoice(state, playerLine), 'Guard', clue));
         setDialog({
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: clue,
           options: [{ label: 'Draw steel', action: startCombat }],
           inputMode: true,
-          onInput: handleGateKaelenInput,
+          onInput: handleGateGuardInput,
         });
         return;
       }
@@ -777,51 +765,51 @@ const App: React.FC = () => {
       if (!GeminiService.isConfigured()) {
         updateStory(state => recordChoice(state, playerLine));
         setDialog({
-          speaker: 'Kaelen',
-          text: 'Kaelen keeps the spear across the road. "Ask about the order, the oath, Silas, or the city. Then give me conscience, or give me steel."',
+          speaker: 'Guard',
+          text: 'Guard keeps the spear across the road. "Ask about the order, the oath, Silas, or the city. Then give me conscience, or give me steel."',
           options: [{ label: 'Draw steel', action: startCombat }],
           inputMode: true,
-          onInput: handleGateKaelenInput,
+          onInput: handleGateGuardInput,
         });
         return;
       }
 
-      const { line, escaped } = await GeminiService.generateKaelenResponse(
+      const { line, escaped } = await GeminiService.generateGuardResponse(
         playerLine, storyRef.current.dialogueHistory,
       );
       updateStory(state => recordChoice(state, playerLine));
       if (escaped) {
         updateStory(state => addLog({
           ...state, flags: { ...state.flags, kaelenMood: 'merciful', gateOutcome: 'persuaded' },
-        }, 'Kaelen lowers his spear and lets Elara pass.'));
+        }, 'Guard lowers his spear and lets Elara pass.'));
         setDialog({
-          speaker: 'Kaelen',
-          text: line || "Kaelen steps aside. His eyes say he won't report this.",
-          options: [{ label: 'Walk through the gate', action: () => goToScene('outskirts', 'Kaelen turns his back on the order and opens the way.') }],
+          speaker: 'Guard',
+          text: line || "Guard steps aside. His eyes say he won't report this.",
+          options: [{ label: 'Walk through the gate', action: () => goToScene('outskirts', 'Guard turns his back on the order and opens the way.') }],
         });
       } else {
         setDialog({
-          speaker: 'Kaelen',
+          speaker: 'Guard',
           text: line,
           options: [{ label: 'Draw steel', action: startCombat }],
           inputMode: true,
-          onInput: handleGateKaelenInput,
+          onInput: handleGateGuardInput,
         });
       }
     } catch (err: unknown) {
       setDialog({
-        speaker: 'Kaelen',
-        text: formatKaelenGeminiError(err),
+        speaker: 'Guard',
+        text: formatGuardGeminiError(err),
         options: [{ label: 'Fight', action: startCombat }],
         inputMode: true,
-        onInput: handleGateKaelenInput,
+        onInput: handleGateGuardInput,
       });
     } finally {
       setIsAiLoading(false);
     }
   }
 
-  const openGateKaelen = async () => {
+  const openGateGuard = async () => {
     const baseOptions: DialogOption[] = [
       { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
       { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
@@ -830,34 +818,34 @@ const App: React.FC = () => {
 
     if (!GeminiService.isConfigured()) {
       setDialog({
-        speaker: 'Kaelen',
-        text: kaelenGateGreeting,
+        speaker: 'Guard',
+        text: guardGateGreeting,
         options: baseOptions,
         inputMode: true,
-        onInput: handleGateKaelenInput,
+        onInput: handleGateGuardInput,
       });
       return;
     }
 
     setIsAiLoading(true);
-    setDialog({ speaker: 'Kaelen', text: '...', options: [] });
+    setDialog({ speaker: 'Guard', text: '...', options: [] });
 
     try {
-      const line = await GeminiService.generateKaelenGreeting('gate', storyRef.current);
+      const line = await GeminiService.generateGuardGreeting('gate', storyRef.current);
       setDialog({
-        speaker: 'Kaelen',
+        speaker: 'Guard',
         text: line,
         options: baseOptions,
         inputMode: true,
-        onInput: handleGateKaelenInput,
+        onInput: handleGateGuardInput,
       });
     } catch (err: unknown) {
       setDialog({
-        speaker: 'Kaelen',
-        text: `${kaelenGateGreeting} (${formatKaelenGeminiError(err)})`,
+        speaker: 'Guard',
+        text: `${guardGateGreeting} (${formatGuardGeminiError(err)})`,
         options: baseOptions,
         inputMode: true,
-        onInput: handleGateKaelenInput,
+        onInput: handleGateGuardInput,
       });
     } finally {
       setIsAiLoading(false);
@@ -878,7 +866,7 @@ const App: React.FC = () => {
       ...state,
       flags: { ...state.flags, gateOutcome: 'secret' },
     }, 'The Rusted Key opens a forgotten side-path under the bridge.'));
-    goToScene('outskirts', 'Elara slips beneath the Great Gate without spilling Kaelen blood.');
+    goToScene('outskirts', 'Elara slips beneath the Great Gate without spilling Guard blood.');
   };
 
   const useGreatGate = () => {
@@ -886,7 +874,7 @@ const App: React.FC = () => {
       blastRuneGate();
       return;
     }
-    openGateKaelen();
+    openGateGuard();
   };
 
   const blastRuneGate = () => {
@@ -901,29 +889,29 @@ const App: React.FC = () => {
     const rules = getDifficultyRules(settings.gameplay.difficulty);
     setDialog(null);
     setCombat({
-      kaelen: rules.kaelenHealth,
-      kaelenMax: rules.kaelenHealth,
+      guard: rules.guardHealth,
+      guardMax: rules.guardHealth,
       elara: story.health,
       elaraMax: story.maxHealth,
-      message: 'Kaelen raises his shield. Time your strikes and guard when you are hurt.',
+      message: 'Guard raises his shield. Time your strikes and guard when you are hurt.',
     });
   }
 
-  const strikeKaelen = () => {
+  const strikeGuard = () => {
     setCombat((current) => {
       if (!current) return current;
       const rules = getDifficultyRules(settings.gameplay.difficulty);
-      const kaelen = Math.max(0, current.kaelen - rules.strikeDamage);
-      const elara = kaelen <= 0 ? current.elara : Math.max(0, current.elara - rules.counterDamage);
-      if (kaelen <= 0) {
+      const guard = Math.max(0, current.guard - rules.strikeDamage);
+      const elara = guard <= 0 ? current.elara : Math.max(0, current.elara - rules.counterDamage);
+      if (guard <= 0) {
         winCombat(elara);
         return null;
       }
-      return { ...current, kaelen, elara, message: 'Your dagger finds a gap. Kaelen answers with the haft of his spear.' };
+      return { ...current, guard, elara, message: 'Your dagger finds a gap. Guard answers with the haft of his spear.' };
     });
   };
 
-  const guardKaelen = () => {
+  const guardGuard = () => {
     setCombat((current) => {
       if (!current) return current;
       const rules = getDifficultyRules(settings.gameplay.difficulty);
@@ -937,16 +925,16 @@ const App: React.FC = () => {
       ...state,
       health: Math.max(1, health),
       flags: { ...state.flags, gateOutcome: 'fought' },
-    }, 'Defeated Kaelen in combat'), 'Kaelen yields, wounded but alive. The bridge is open.'));
-    goToScene('outskirts', 'Elara limps past Kaelen and into the fog.');
+    }, 'Defeated Guard in combat'), 'Guard yields, wounded but alive. The bridge is open.'));
+    goToScene('outskirts', 'Elara limps past Guard and into the fog.');
   };
 
   const retryCombat = () => {
     updateStory((state) => ({ ...state, health: state.maxHealth }));
     const rules = getDifficultyRules(settings.gameplay.difficulty);
     setCombat({
-      kaelen: rules.kaelenHealth,
-      kaelenMax: rules.kaelenHealth,
+      guard: rules.guardHealth,
+      guardMax: rules.guardHealth,
       elara: story.maxHealth,
       elaraMax: story.maxHealth,
       message: 'You steady yourself and try the duel again.',
@@ -974,7 +962,7 @@ const App: React.FC = () => {
   };
 
   const resetGame = () => {
-    localStorage.removeItem('shadow_toll_story');
+    localStorage.removeItem('nightshade_story');
     setStory(INITIAL_STORY_STATE);
     setDialog(null);
     setCombat(null);
@@ -1041,7 +1029,7 @@ const App: React.FC = () => {
 
   const loadingProgress = Math.round(((gameShellProgress * 0.35) + (phaserProgress * 0.65)) * 100);
 
-  const hasSave = localStorage.getItem('shadow_toll_story') !== null;
+  const hasSave = localStorage.getItem('nightshade_story') !== null;
 
   if (!isGameStarted) {
     return (
@@ -1243,8 +1231,8 @@ const App: React.FC = () => {
       {combat && (
         <CombatOverlay
           combat={combat}
-          onStrike={strikeKaelen}
-          onGuard={guardKaelen}
+          onStrike={strikeGuard}
+          onGuard={guardGuard}
           onRetry={retryCombat}
         />
       )}
@@ -1389,13 +1377,13 @@ const CombatOverlay: React.FC<{
 }> = ({ combat, onStrike, onGuard, onRetry }) => {
   const defeated = combat.elara <= 0;
   const elaraHP = (combat.elara / combat.elaraMax) * 100;
-  const kaelenHP = (combat.kaelen / combat.kaelenMax) * 100;
+  const guardHP = (combat.guard / combat.guardMax) * 100;
 
   return (
     <div className="combat-overlay">
       <div className="combat-panel">
         <button className="dialog-close" onClick={onRetry}><X size={18} /></button>
-        <h2>Kaelen's Order</h2>
+        <h2>Guard's Order</h2>
         <p>{defeated ? 'Elara falls to one knee. The bridge blurs. Try the duel again.' : combat.message}</p>
         
         <div className="flex flex-col gap-6 mt-8">
@@ -1421,8 +1409,8 @@ const CombatOverlay: React.FC<{
 
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-end">
-              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px', color: '#ffe0a0' }}>KAELEN</span>
-              <span style={{ fontSize: '14px', color: '#d4a373' }}>{combat.kaelen} / {combat.kaelenMax}</span>
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px', color: '#ffe0a0' }}>GUARD</span>
+              <span style={{ fontSize: '14px', color: '#d4a373' }}>{combat.guard} / {combat.guardMax}</span>
             </div>
             <div style={{
               width: '100%', height: '12px',
@@ -1432,7 +1420,7 @@ const CombatOverlay: React.FC<{
               boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
             }}>
               <div style={{
-                width: `${kaelenHP}%`, height: '100%',
+                width: `${guardHP}%`, height: '100%',
                 background: 'linear-gradient(180deg, #581c1c 0%, #991b1b 50%, #581c1c 100%)',
                 transition: 'width 0.3s ease-out'
               }} />
@@ -1456,7 +1444,7 @@ const CombatOverlay: React.FC<{
 };
 
 const loadStory = (): StoryState => {
-  const raw = localStorage.getItem('shadow_toll_story');
+  const raw = localStorage.getItem('nightshade_story');
   if (!raw) return INITIAL_STORY_STATE;
 
   try {

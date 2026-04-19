@@ -363,10 +363,10 @@ export class GameScene extends Phaser.Scene {
   // ── Cell scene ───────────────────────────────────────────────────────────────
 
   private buildCell(bY: number, palette: { floor: number; accent: number }) {
-    this.drawGuardKaelen(this.v(1080), bY);
+    this.drawGuardVisual(this.v(1080), bY);
     // Interaction zone at bars edge; label rendered over the sprite on the other side
-    this.addInteractable('kaelen', 'Kaelen', 'Speak with Kaelen through the bars',
-      this.v(700), bY - this.v(60), this.v(50), this.v(700), palette.accent, 0.0, this.v(1096), bY - this.v(374));
+    this.addInteractable('guard', 'Guard', 'Speak with the Guard through the bars',
+      this.v(700), bY - this.v(60), this.v(50), this.v(700), palette.accent, 0.0, this.v(1100), bY - this.v(540));
     this.addInteractable('cell_exit', 'Bars', 'Slip through the unlocked bars',
       this.v(700), bY - this.v(60), this.v(50), this.v(700), 0x4a6080, 0.0, this.v(700));
 
@@ -382,17 +382,17 @@ export class GameScene extends Phaser.Scene {
 
   // ── Cell visual helpers ──────────────────────────────────────────────────────
 
-  private drawGuardKaelen(x: number, y: number) {
-    const kaelen = this.add.sprite(x, y, 'guide')
+  private drawGuardVisual(x: number, y: number) {
+    const guard = this.add.sprite(x, y, 'guide')
       .setOrigin(0.5, 1)
       .setDepth(22)
       .setScale(this.getPlayerScale(279) * 0.85)
       .setName('kaelen_visual');
 
     if (this.anims.exists('guide-idle')) {
-      kaelen.play('guide-idle');
+      guard.play('guide-idle');
     }
-    return kaelen;
+    return guard;
   }
 
   private drawRat(x: number, y: number) {
@@ -491,9 +491,9 @@ export class GameScene extends Phaser.Scene {
       .setStrokeStyle(this.v(4), palette.accent, 0.45);
     this.add.rectangle(this.v(1885), height - this.v(325), this.v(18), this.v(520), palette.accent, 0.3);
 
-    this.drawGuardKaelen(this.v(1690), height);
-    this.addInteractable('kaelen_gate', 'Kaelen',
-      'Face Kaelen at the Great Gate', this.v(1690), height - this.v(209), this.v(160), this.v(419), 0xd6a843);
+    this.drawGuardVisual(this.v(1690), height);
+    this.addInteractable('guard_gate', 'Guard',
+      'Face the Guard at the Great Gate', this.v(1690), height - this.v(209), this.v(160), this.v(419), 0xd6a843, 0.0, this.v(1710), height - this.v(540));
     this.addInteractable('gate_lock', 'Gate Lock',
       'Open the secret side-path with the Rusted Key', this.v(1775), height - this.v(170), this.v(62), this.v(84), 0x6b5b48);
     this.addInteractable('great_gate', 'Great Gate',
@@ -579,7 +579,7 @@ export class GameScene extends Phaser.Scene {
       const hasKey = state.inventory.includes('rusted_key');
       const hidden =
         (item.id === 'rat' && state.flags.ratPaid) ||
-        (item.id === 'kaelen' && hasKey) ||
+        (item.id === 'guard' && hasKey) ||
         (item.id === 'cell_exit' && !hasKey) ||
         (item.id === 'collect_coin' && state.flags.coinFound) ||
         (item.id === 'market_exit' && !state.inventory.includes('gate_pass')) ||

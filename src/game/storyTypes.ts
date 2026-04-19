@@ -56,7 +56,7 @@ export const STORY_ITEMS: Record<StoryItemId, StoryItem> = {
   rusted_key: {
     id: 'rusted_key',
     name: 'Rusted Key',
-    description: 'Kaelen trusted you with this. It opens old locks and older doubts.',
+    description: 'The Guard trusted you with this. It opens old locks and older doubts.',
     icon: 'K',
   },
   coin_pouch: {
