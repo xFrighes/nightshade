@@ -90,7 +90,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg_underground', '/bg_underground.webp');
     this.load.image('rat', '/rat.webp');
     this.load.spritesheet('guide', '/guide.webp', { frameWidth: 170, frameHeight: 279 });
-    this.load.atlas('player_anim', '/elara.webp', '/player_sheet.json');
+    this.load.spritesheet('player-idle', '/elara-idle.png', { frameWidth: 256, frameHeight: 256 });
+    this.load.spritesheet('player-walk', '/elara-walk.png', { frameWidth: 256, frameHeight: 256 });
 
     this.load.audio('sfx_jump', '/sounds/jump.wav');
     this.load.audio('sfx_collect', '/sounds/collect.wav');
@@ -103,7 +104,7 @@ export class GameScene extends Phaser.Scene {
 
   private getWorldHeight() { return this.scale.height + 400; }
   private getBaseY() { return this.scale.height - this.v(72); }
-  private getPlayerScale() { return (this.v(262) / 618) * 1.6; }
+  private getPlayerScale(h = 256) { return (this.v(262) / h) * 2.8; }
 
   create() {
     const { height } = this.scale;
@@ -115,16 +116,16 @@ export class GameScene extends Phaser.Scene {
     if (!this.anims.exists('player-idle')) {
       this.anims.create({
         key: 'player-idle',
-        frames: this.anims.generateFrameNames('player_anim', { prefix: 'idle_', start: 0, end: 2 }),
-        frameRate: 6,
+        frames: this.anims.generateFrameNumbers('player-idle', { start: 0, end: 24 }),
+        frameRate: 10,
         repeat: -1,
       });
     }
     if (!this.anims.exists('player-walk')) {
       this.anims.create({
         key: 'player-walk',
-        frames: this.anims.generateFrameNames('player_anim', { prefix: 'walk_', start: 0, end: 4 }),
-        frameRate: 10,
+        frames: this.anims.generateFrameNumbers('player-walk', { start: 0, end: 24 }),
+        frameRate: 15,
         repeat: -1,
       });
     }
@@ -141,7 +142,7 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    this.player = this.physics.add.sprite(130, this.getBaseY(), 'player_anim');
+    this.player = this.physics.add.sprite(130, this.getBaseY(), 'player-idle');
     this.player.setOrigin(0.5, 1);
     this.player.setScale(this.getPlayerScale());
     this.player.setCollideWorldBounds(true);
@@ -198,7 +199,6 @@ export class GameScene extends Phaser.Scene {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    this.syncPlayerBodyToFrame();
     const speed = this.v(this.currentState?.flags.runeTaken ? 285 : 245);
     const jump = this.v(this.currentState?.flags.runeTaken ? 610 : 470);
     const verticalKey = this.settings?.controls.invertY ? this.actionKeys.moveDown : this.actionKeys.moveUp;
@@ -244,7 +244,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.player.play(left || right ? 'player-walk' : 'player-idle', true);
+    const nextAnim = left || right ? 'player-walk' : 'player-idle';
+    if (this.player.anims.currentAnim?.key !== nextAnim) {
+      this.player.play(nextAnim, true);
+    }
+
+    this.syncPlayerBodyToFrame();
     this.player.setDepth(this.player.y);
     this.updateNearestInteractable();
 
@@ -328,6 +333,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setScale(this.getPlayerScale());
     this.player.setPosition(this.v(this.sceneStartX(state.scene)), baseY);
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+    this.player.play('player-idle');
     this.syncPlayerBodyToFrame();
 
     this.sceneTitleText = this.add.text(this.v(26), this.v(24), SCENE_TITLES[state.scene], {
@@ -380,7 +386,7 @@ export class GameScene extends Phaser.Scene {
     const kaelen = this.add.sprite(x, y, 'guide')
       .setOrigin(0.5, 1)
       .setDepth(22)
-      .setScale(this.getPlayerScale() * (618 / 279))
+      .setScale(this.getPlayerScale(279) * 0.85)
       .setName('kaelen_visual');
 
     if (this.anims.exists('guide-idle')) {
@@ -538,13 +544,16 @@ export class GameScene extends Phaser.Scene {
     if (!this.player?.body || !this.player.frame) return;
 
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const bodyWidth = this.v(126);
-    const bodyHeight = this.v(316);
+    const bodyWidth = this.v(160);
+    const bodyHeight = this.v(360);
     const frameWidth = this.player.frame.realWidth;
     const frameHeight = this.player.frame.realHeight;
 
     body.setSize(bodyWidth / this.player.scaleX, bodyHeight / this.player.scaleY);
-    body.setOffset((frameWidth - (bodyWidth / this.player.scaleX)) / 2, frameHeight - (bodyHeight / this.player.scaleY));
+    body.setOffset(
+      (frameWidth - (bodyWidth / this.player.scaleX)) / 2,
+      frameHeight - (bodyHeight / this.player.scaleY) - 40
+    );
   }
 
   private addInteractable(
