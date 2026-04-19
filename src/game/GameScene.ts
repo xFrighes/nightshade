@@ -7,21 +7,23 @@ type Interactable = {
   hint: string;
   rect: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
-  once?: boolean;
 };
 
 type VirtualInputKey = 'left' | 'right' | 'jump';
 
+const CELL_BARS_RIGHT_EDGE = 720;
+const CELL_SPAWN_X = 200;
+
 const SCENE_TITLES: Record<StorySceneId, string> = {
-  cell: 'Scene 1 - The Iron Cell',
-  market: 'Scene 2 - The Under-Market',
-  cathedral: 'Scene 3 - The Cathedral Ward',
-  gate: 'Scene 4 - The Great Gate',
-  outskirts: 'Scene 5 - The Outskirts',
+  cell: 'Scene 1 — The Iron Cell',
+  market: 'Scene 2 — The Under-Market',
+  cathedral: 'Scene 3 — The Cathedral Ward',
+  gate: 'Scene 4 — The Great Gate',
+  outskirts: 'Scene 5 — The Outskirts',
 };
 
 const SCENE_PALETTES: Record<StorySceneId, { sky: number; back: number; floor: number; accent: number }> = {
-  cell: { sky: 0x10131a, back: 0x232834, floor: 0x3b3b44, accent: 0xb6bcc8 },
+  cell: { sky: 0x07090f, back: 0x141820, floor: 0x252530, accent: 0x8aaac8 },
   market: { sky: 0x180a24, back: 0x2d123f, floor: 0x35273d, accent: 0xa855f7 },
   cathedral: { sky: 0x100915, back: 0x21152b, floor: 0x33283b, accent: 0x8b5cf6 },
   gate: { sky: 0x17131a, back: 0x2d2932, floor: 0x49414a, accent: 0xf59e0b },
@@ -41,6 +43,8 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
   private interactKey!: Phaser.Input.Keyboard.Key;
+  private hideUIKey!: Phaser.Input.Keyboard.Key;
+  private inventoryKey!: Phaser.Input.Keyboard.Key;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private interactables: Interactable[] = [];
   private prompt!: Phaser.GameObjects.Text;
@@ -48,50 +52,51 @@ export class GameScene extends Phaser.Scene {
   private currentScene?: StorySceneId;
   private near?: Interactable;
   private lastInteractAt = 0;
-  private virtualInput = {
-    left: false,
-    right: false,
-    jump: false,
-  };
+  private introShown = false;
+  private virtualInput = { left: false, right: false, jump: false };
+  private viewScale = 1;
+  private sceneTitleText?: Phaser.GameObjects.Text;
+  private uiVisible = true;
+  private bgImage?: Phaser.GameObjects.Image;
 
-  constructor() {
-    super('GameScene');
-  }
+  constructor() { super('GameScene'); }
+
+  private v(n: number) { return n * this.viewScale; }
 
   preload() {
-    this.load.image('mood_bg', '/bg.png');
     this.load.image('bg_cell', '/bg_cell.png');
+    this.load.image('bg_cell_open', '/bg_cell_open.png');
     this.load.image('bg_market', '/bg_market.png');
     this.load.image('bg_cathedral', '/bg_cathedral.png');
     this.load.image('bg_gate', '/bg_gate.png');
     this.load.image('bg_escape', '/bg_escape.png');
     this.load.image('bg_city', '/bg_city.png');
     this.load.image('bg_underground', '/bg_underground.png');
+    this.load.image('rat', '/rat.png');
+    this.load.spritesheet('guide', '/guide.png', { frameWidth: 170, frameHeight: 279 });
     
-    // Load the uniform 800x800 spritesheet
+    // Character Look: Uniform 800x800 spritesheet
     this.load.spritesheet('player_elara', '/elara.png', { frameWidth: 800, frameHeight: 800 });
   }
 
-  private getWorldHeight() {
-    return this.scale.height + 400;
-  }
+  // ── Lifecycle ────────────────────────────────────────────────────────────────
 
-  private getBaseY() {
-    return this.scale.height - 320;
-  }
+  private getWorldHeight() { return this.scale.height + 400; }
+  private getBaseY() { return this.scale.height - this.v(72); }
+  private getPlayerScale() { return (this.v(262) / 500) * 1.6; }
 
   create() {
     const { width, height } = this.scale;
     const worldHeight = this.getWorldHeight();
 
     this.physics.world.setBounds(0, 0, 2200, worldHeight);
-    this.cameras.main.setBounds(0, 0, 2200, worldHeight);
+    this.cameras.main.setBounds(0, 0, 2200, height);
 
+    // Cleanly define animations for Elara
     if (this.anims.exists('player-idle')) this.anims.remove('player-idle');
     if (this.anims.exists('player-walk')) this.anims.remove('player-walk');
     if (this.anims.exists('player-jump')) this.anims.remove('player-jump');
 
-    // Idle frames: 4-7 in the uniform sheet
     this.anims.create({
       key: 'player-idle',
       frames: this.anims.generateFrameNumbers('player_elara', { start: 4, end: 4 }),
@@ -99,7 +104,6 @@ export class GameScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Walk frames: 0-3 in the uniform sheet
     this.anims.create({
       key: 'player-walk',
       frames: this.anims.generateFrameNumbers('player_elara', { start: 0, end: 3 }),
@@ -107,7 +111,6 @@ export class GameScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Jump frame: 8 in the uniform sheet
     this.anims.create({
       key: 'player-jump',
       frames: this.anims.generateFrameNumbers('player_elara', { start: 8, end: 8 }),
@@ -115,14 +118,24 @@ export class GameScene extends Phaser.Scene {
       repeat: -1
     });
 
+    if (!this.anims.exists('guide-idle')) {
+      this.anims.create({
+        key: 'guide-idle',
+        frames: [
+          ...this.anims.generateFrameNumbers('guide', { start: 0, end: 2 }),
+          ...this.anims.generateFrameNumbers('guide', { start: 1, end: 1 })
+        ],
+        frameRate: 5,
+        repeat: -1,
+      });
+    }
+
     this.player = this.physics.add.sprite(130, this.getBaseY(), 'player_elara', 4);
     this.player.setOrigin(0.5, 1);
     this.player.setScale(0.45); 
     this.player.setCollideWorldBounds(true);
-    
-    const body = this.player.body as Phaser.Physics.Arcade.Body;
-    body.setSize(120, 680); 
-    body.setOffset(340, 120); 
+    this.player.play('player-idle');
+    this.syncPlayerBodyToFrame();
 
     this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
     this.cameras.main.setFollowOffset(0, 80);
@@ -133,6 +146,8 @@ export class GameScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>;
     this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.hideUIKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.H);
+    this.inventoryKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I);
 
     this.prompt = this.add.text(width / 2, height - 92, '', {
       fontFamily: 'VT323, monospace',
@@ -143,46 +158,60 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(5000);
 
     this.game.events.on('story_update', (state: StoryState) => this.applyStoryState(state));
+    this.game.events.on('ui_visibility', (visible: boolean) => {
+      this.uiVisible = visible;
+      this.prompt.setAlpha(visible ? 1 : 0);
+      this.sceneTitleText?.setAlpha(visible ? 1 : 0);
+    });
     this.game.events.on('virtual_input', (input: { key: VirtualInputKey; active: boolean }) => {
       this.virtualInput[input.key] = input.active;
     });
     this.game.events.on('virtual_interact', () => {
-      if (this.near) {
-        this.emitAction(this.near.id.startsWith('collect_')
-          ? { type: 'collect', target: this.near.id }
-          : { type: 'interact', target: this.near.id });
-      }
+      if (this.near) this.emitAction(this.near.id.startsWith('collect_')
+        ? { type: 'collect', target: this.near.id }
+        : { type: 'interact', target: this.near.id });
     });
     this.scale.on('resize', this.handleResize, this);
-
     this.applyStoryState((this.game.registry.get('story_state') as StoryState | undefined) ?? undefined);
   }
 
   update() {
     if (!this.player?.body) return;
+
+    const tag = (document.activeElement as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+    this.syncPlayerBodyToFrame();
     
-    const speed = this.currentState?.flags.runeTaken ? 285 : 245;
-    const jumpVelocity = this.currentState?.flags.runeTaken ? 610 : 470;
+    const speed = this.v(this.currentState?.flags.runeTaken ? 285 : 245);
+    const jumpVelocity = this.v(this.currentState?.flags.runeTaken ? 610 : 470);
     const left = this.cursors.left.isDown || this.wasd.A.isDown || this.virtualInput.left;
     const right = this.cursors.right.isDown || this.wasd.D.isDown || this.virtualInput.right;
-    const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasd.W) || this.virtualInput.jump;
+    const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up)
+      || Phaser.Input.Keyboard.JustDown(this.wasd.W)
+      || this.virtualInput.jump;
 
     body.setVelocityX(0);
-
-    if (left) {
-      body.setVelocityX(-speed);
-      this.player.setFlipX(true);
-    } else if (right) {
-      body.setVelocityX(speed);
-      this.player.setFlipX(false);
-    }
-
+    if (left) { body.setVelocityX(-speed); this.player.setFlipX(true); }
+    if (right) { body.setVelocityX(speed); this.player.setFlipX(false); }
     if (jumpPressed && body.blocked.down) {
       body.setVelocityY(-jumpVelocity);
       this.virtualInput.jump = false;
     }
 
+    if (this.currentState?.scene === 'cell') {
+      if (this.player.x > this.v(CELL_BARS_RIGHT_EDGE)) {
+        this.player.x = this.v(CELL_BARS_RIGHT_EDGE);
+        body.setVelocityX(0);
+      }
+      if (this.player.x < this.v(CELL_SPAWN_X)) {
+        this.player.x = this.v(CELL_SPAWN_X);
+        body.setVelocityX(0);
+      }
+    }
+
+    // Character Logic Animation
     if (!body.blocked.down) {
       this.player.play('player-jump', true);
     } else if (Math.abs(body.velocity.x) > 0.1) {
@@ -201,15 +230,24 @@ export class GameScene extends Phaser.Scene {
         : { type: 'interact', target: this.near.id });
     }
 
-    if (this.currentState?.scene === 'outskirts' && this.player.x > 1960) {
+    if (Phaser.Input.Keyboard.JustDown(this.hideUIKey)) {
+      this.game.events.emit('toggle_ui');
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.inventoryKey)) {
+      this.game.events.emit('toggle_inventory');
+    }
+
+    if (this.currentState?.scene === 'outskirts' && this.player.x > this.physics.world.bounds.width - 240) {
       this.emitAction({ type: 'scene_complete', scene: 'outskirts' });
     }
   }
 
+  // ── Story wiring ─────────────────────────────────────────────────────────────
+
   private applyStoryState(state?: StoryState) {
     if (!state) return;
     this.currentState = state;
-
     if (this.currentScene !== state.scene) {
       this.currentScene = state.scene;
       this.rebuildScene(state);
@@ -220,74 +258,72 @@ export class GameScene extends Phaser.Scene {
 
   private rebuildScene(state: StoryState) {
     for (const child of [...this.children.list]) {
-      if (child !== this.player) {
-        child.destroy();
-      }
+      if (child !== this.player) child.destroy();
     }
     this.platforms.clear(true, true);
     this.interactables = [];
     this.near = undefined;
 
     const { width, height } = this.scale;
+    this.viewScale = height / 1080; // Reference height where placements were correct
     const worldHeight = this.getWorldHeight();
     const baseY = this.getBaseY();
     const palette = SCENE_PALETTES[state.scene];
 
-    const worldWidth = this.physics.world.bounds.width || 2200;
     this.cameras.main.setBackgroundColor(palette.sky);
-    
-    const bg = this.add.image(0, 0, SCENE_BACKGROUNDS[state.scene]).setOrigin(0, 0);
-    const reqWidth = width + (worldWidth - width) * 0.18;
-    const reqHeight = height + 400 * 0.18;
-    const bgScale = Math.max(reqWidth / bg.width, reqHeight / bg.height);
-    bg.setScale(bgScale);
-    bg.setPosition(0, 0);
-    bg.setScrollFactor(0.18);
-    bg.setAlpha(state.flags.runeTaken ? 0.74 : 0.92);
+    const bgKey = state.scene === 'cell' && state.inventory.includes('rusted_key')
+      ? 'bg_cell_open'
+      : SCENE_BACKGROUNDS[state.scene];
+    const bg = this.add.image(0, height / 2, bgKey)
+      .setAlpha(state.flags.runeTaken ? 0.74 : 0.92)
+      .setDepth(0);
+    this.bgImage = bg;
 
-    this.drawAtmosphere(state.scene, palette);
-    this.addPlatform(1100, baseY + 60, 2200, 120, 0x000000, 0);
+    const bgScale = height / bg.height;
+    bg.setScale(bgScale);
+
+    const worldWidth = bg.displayWidth;
+    bg.setX(worldWidth / 2);
+    bg.setScrollFactor(1, 0);
+
+    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+    this.cameras.main.setBounds(0, 0, worldWidth, height);
+
+    this.drawAtmosphere(state.scene, palette, worldWidth);
+    this.addPlatform(worldWidth / 2, baseY + this.v(60), worldWidth, this.v(120), 0x000000, 0);
 
     if (state.scene === 'cell') this.buildCell(baseY, palette);
-    if (state.scene === 'market') this.buildMarket(baseY, palette);
-    if (state.scene === 'cathedral') this.buildCathedral(baseY, palette);
+    if (state.scene === 'market') this.buildMarket(baseY);
+    if (state.scene === 'cathedral') this.buildCathedral(baseY);
     if (state.scene === 'gate') this.buildGate(baseY, palette);
-    if (state.scene === 'outskirts') this.buildOutskirts(baseY, palette);
+    if (state.scene === 'outskirts') this.buildOutskirts(baseY);
 
-    this.player.setPosition(this.sceneStartX(state.scene), baseY);
+    this.player.setScale(0.45); // Standard Elara scale for 800x800
+    this.player.setPosition(this.v(this.sceneStartX(state.scene)), baseY);
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+    this.syncPlayerBodyToFrame();
 
-    this.cameras.main.setBounds(0, 0, 2200, worldHeight);
-
-    this.prompt = this.add.text(width / 2, height - 92, '', {
+    this.prompt = this.add.text(width / 2, height - this.v(92), '', {
       fontFamily: 'VT323, monospace',
-      fontSize: '30px',
+      fontSize: `${Math.round(this.v(30))}px`,
       color: '#f5d78e',
       backgroundColor: 'rgba(5,4,8,0.72)',
-      padding: { x: 14, y: 8 },
+      padding: { x: this.v(14), y: this.v(8) },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(5000);
+    this.prompt.setAlpha(this.uiVisible ? 1 : 0);
 
-    this.add.text(26, 24, SCENE_TITLES[state.scene], {
+    this.sceneTitleText = this.add.text(this.v(26), this.v(24), SCENE_TITLES[state.scene], {
       fontFamily: 'VT323, monospace',
-      fontSize: '32px',
+      fontSize: `${Math.round(this.v(32))}px`,
       color: '#f9d27d',
       stroke: '#050408',
-      strokeThickness: 5,
+      strokeThickness: this.v(5),
     }).setScrollFactor(0).setDepth(5000);
-
-    const controls = state.scene === 'cell'
-      ? 'Move with A/D or arrows. Click glowing objects or press E to interact.'
-      : 'Climb, click glowing objects, or press E when a prompt appears.';
-    this.add.text(26, 62, controls, {
-      fontFamily: 'VT323, monospace',
-      fontSize: '24px',
-      color: '#d6c7e8',
-      stroke: '#050408',
-      strokeThickness: 4,
-    }).setScrollFactor(0).setDepth(5000);
+    this.sceneTitleText.setAlpha(this.uiVisible ? 1 : 0);
 
     if (state.flags.runeTaken) {
-      this.add.rectangle(0, 0, 2200, height, 0x35104d, 0.24).setOrigin(0).setBlendMode(Phaser.BlendModes.MULTIPLY);
+      this.add.rectangle(0, 0, 2200, height, 0x35104d, 0.24)
+        .setOrigin(0).setBlendMode(Phaser.BlendModes.MULTIPLY);
       this.add.text(width - 34, 30, 'RUNE JUMP ACTIVE', {
         fontFamily: 'VT323, monospace',
         fontSize: '26px',
@@ -300,147 +336,246 @@ export class GameScene extends Phaser.Scene {
     this.refreshVisibility(state);
   }
 
-  private buildCell(height: number, palette: { floor: number; accent: number }) {
-    this.addPlatform(515, height - 210, 260, 26, 0x4d5565);
-    this.addPlatform(840, height - 330, 230, 26, 0x4d5565);
-    this.drawBars(420, height - 340);
-    this.addInteractable('kaelen', 'Kaelen', 'Talk to Kaelen', 520, height - 250, 56, 100, palette.accent);
-    this.addInteractable('rat', 'Guard-rat', 'Distract the guard-rat with Bread', 750, height - 128, 42, 28, 0x6b4f3a);
-    this.addInteractable('collect_dagger', 'Iron Dagger', 'Pick up the forgotten Iron Dagger', 930, height - 132, 42, 16, 0xc0c6d0);
-    this.addInteractable('cell_exit', 'Broken Drain', 'Crawl into the Under-Market', 1300, height - 128, 92, 52, 0x1d1d25);
+  // ── Cell scene ───────────────────────────────────────────────────────────────
+
+  private buildCell(bY: number, palette: { floor: number; accent: number }) {
+    this.drawGuardKaelen(this.v(1080), bY);
+    // Interaction zone at bars edge; label rendered over the sprite on the other side
+    this.addInteractable('kaelen', 'Kaelen', 'Speak with Kaelen through the bars',
+      this.v(700), bY - this.v(60), this.v(50), this.v(700), palette.accent, 0.0, this.v(1096), bY - this.v(374));
+    this.addInteractable('cell_exit', 'Bars', 'Slip through the unlocked bars',
+      this.v(700), bY - this.v(60), this.v(50), this.v(700), 0x4a6080, 0.0, this.v(700));
+
+    this.drawRat(this.v(435), bY - this.v(195));
+    this.addInteractable('rat', 'Guard-rat', 'Bribe the rat',
+      this.v(435), bY - this.v(60), this.v(140), this.v(90), 0x7a5030, 0.0, undefined, bY - this.v(310));
+
+    if (!this.introShown) {
+      this.introShown = true;
+      this.showCellIntro();
+    }
   }
 
-  private buildMarket(height: number, palette: { floor: number; accent: number }) {
-    this.addPlatform(520, height - 200, 260, 26, 0x4a3558);
-    this.addPlatform(870, height - 315, 230, 26, 0x5b3a70);
-    this.addPlatform(1210, height - 230, 250, 26, 0x4a3558);
-    this.addLanterns([220, 430, 750, 1060, 1430, 1740], height, palette.accent);
-    this.addInteractable('collect_coin', 'Coin Pouch', 'Jump up and collect the hidden Coin Pouch', 890, height - 360, 46, 34, 0xd6a843);
-    this.addInteractable('silas', 'Silas the Broker', 'Bargain for the gate pass', 1580, height - 150, 64, 112, 0x7e22ce);
-    this.addInteractable('market_exit', 'Ward Stairs', 'Enter the Cathedral Ward', 2030, height - 150, 90, 110, 0x42304d);
+  // ── Cell visual helpers ──────────────────────────────────────────────────────
+
+  private drawGuardKaelen(x: number, y: number) {
+    const kaelen = this.add.sprite(x, y, 'guide')
+      .setOrigin(0.5, 1)
+      .setDepth(22)
+      .setScale(this.getPlayerScale() * (500 / 279))
+      .setName('kaelen_visual');
+
+    if (this.anims.exists('guide-idle')) {
+      kaelen.play('guide-idle');
+    }
+    return kaelen;
   }
 
-  private buildCathedral(height: number, palette: { floor: number; accent: number }) {
-    this.addPlatform(430, height - 230, 300, 28, 0x3d3348);
-    this.addPlatform(810, height - 360, 260, 28, 0x4d4058);
-    this.addPlatform(1190, height - 250, 270, 28, 0x3d3348);
-    this.addPlatform(1540, height - 405, 330, 28, 0x4d4058);
-    this.addGothicWindows([300, 620, 980, 1320, 1720], height, palette.accent);
-    this.addInteractable('envoy', 'Nightshade Envoy', 'Hear the Envoy offer the Purple Rune', 1580, height - 470, 62, 106, 0x312e81);
-    this.addInteractable('cathedral_exit', 'Fortified Road', 'Leave for the Great Gate', 2060, height - 150, 92, 110, 0x2c2634);
+  private drawRat(x: number, y: number) {
+    const rat = this.add.image(x, y, 'rat')
+      .setOrigin(0.5, 1)
+      .setDepth(100)
+      .setName('rat_visual')
+      .setFlipX(true)
+      .setDisplaySize(this.v(180), this.v(102));
+
+    this.tweens.add({
+      targets: rat,
+      scaleX: '*=1.04',
+      scaleY: '*=0.96',
+      duration: 800,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private showCellIntro() {
+    const { width, height } = this.scale;
+    const overlay = this.add.rectangle(width / 2, height / 2, width * 3, height * 3, 0x000000, 0)
+      .setScrollFactor(0).setDepth(9998);
+    const text = this.add.text(width / 2, height / 2,
+      'Year 3 of the Darkness.\n\nThe Iron Cell  —  City of Ashenmoor.\n\nElara wakes.', {
+      fontFamily: 'VT323, monospace',
+      fontSize: `${Math.round(this.v(44))}px`,
+      color: '#e8d0a0',
+      align: 'center',
+      lineSpacing: this.v(14),
+      stroke: '#000000',
+      strokeThickness: this.v(4),
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(9999).setAlpha(0);
+
+    this.tweens.chain({
+      tweens: [
+        { targets: overlay, alpha: 1, duration: 300 },
+        { targets: text, alpha: 1, duration: 500, delay: 100 },
+        { targets: text, alpha: 1, duration: 2400 },
+        { targets: text, alpha: 0, duration: 500 },
+        {
+          targets: overlay, alpha: 0, duration: 700,
+          onComplete: () => { overlay.destroy(); text.destroy(); }
+        },
+      ],
+    });
+  }
+
+  // ── Other scenes ─────────────────────────────────────────────────────────────
+
+  private buildMarket(height: number) {
+    this.addPlatform(this.v(520), height - this.v(200), this.v(260), this.v(26), 0x4a3558);
+    this.addPlatform(this.v(870), height - this.v(315), this.v(230), this.v(26), 0x5b3a70);
+    this.addPlatform(this.v(1210), height - this.v(230), this.v(250), this.v(26), 0x4a3558);
+    this.addInteractable('collect_coin', 'Coin Pouch',
+      'Jump up and collect the hidden Coin Pouch', this.v(890), height - this.v(360), this.v(46), this.v(34), 0xd6a843);
+    this.addInteractable('silas', 'Silas the Broker',
+      'Bargain for the gate pass', this.v(1580), height - this.v(150), this.v(64), this.v(112), 0x7e22ce);
+    this.addInteractable('market_exit', 'Ward Stairs',
+      'Enter the Cathedral Ward', this.v(2030), height - this.v(150), this.v(90), this.v(110), 0x42304d);
+  }
+
+  private buildCathedral(height: number) {
+    this.addPlatform(this.v(430), height - this.v(230), this.v(300), this.v(28), 0x3d3348);
+    this.addPlatform(this.v(810), height - this.v(360), this.v(260), this.v(28), 0x4d4058);
+    this.addPlatform(this.v(1190), height - this.v(250), this.v(270), this.v(28), 0x3d3348);
+    this.addPlatform(this.v(1540), height - this.v(405), this.v(330), this.v(28), 0x4d4058);
+    this.addInteractable('envoy', 'Nightshade Envoy',
+      'Hear the Envoy offer the Purple Rune', this.v(1580), height - this.v(470), this.v(62), this.v(106), 0x312e81);
+    this.addInteractable('cathedral_exit', 'Fortified Road',
+      'Leave for the Great Gate', this.v(2060), height - this.v(150), this.v(92), this.v(110), 0x2c2634);
   }
 
   private buildGate(height: number, palette: { floor: number; accent: number }) {
-    this.addPlatform(450, height - 230, 300, 28, 0x574b55);
-    this.addPlatform(940, height - 300, 300, 28, 0x574b55);
-    this.addPlatform(1320, height - 205, 260, 28, 0x574b55);
-    this.add.rectangle(1860, height - 325, 170, 520, 0x1d1b22).setStrokeStyle(4, palette.accent, 0.45);
-    this.add.rectangle(1885, height - 325, 18, 520, palette.accent, 0.3);
-    this.addInteractable('kaelen_gate', 'Kaelen', 'Face Kaelen at the Great Gate', 1130, height - 160, 68, 122, 0xd6a843);
-    this.addInteractable('gate_lock', 'Gate Lock', 'Open the secret side-path with the Rusted Key', 1775, height - 170, 62, 84, 0x6b5b48);
-    this.addInteractable('great_gate', 'Great Gate', 'Blast or force the Great Gate', 1915, height - 210, 110, 230, 0x312e81);
+    this.addPlatform(this.v(450), height - this.v(230), this.v(300), this.v(28), 0x574b55);
+    this.addPlatform(this.v(940), height - this.v(300), this.v(300), this.v(28), 0x574b55);
+    this.addPlatform(this.v(1320), height - this.v(205), this.v(260), this.v(28), 0x574b55);
+    this.add.rectangle(this.v(1860), height - this.v(325), this.v(170), this.v(520), 0x1d1b22)
+      .setStrokeStyle(this.v(4), palette.accent, 0.45);
+    this.add.rectangle(this.v(1885), height - this.v(325), this.v(18), this.v(520), palette.accent, 0.3);
+
+    this.drawGuardKaelen(this.v(1690), height);
+    this.addInteractable('kaelen_gate', 'Kaelen',
+      'Face Kaelen at the Great Gate', this.v(1690), height - this.v(209), this.v(160), this.v(419), 0xd6a843);
+    this.addInteractable('gate_lock', 'Gate Lock',
+      'Open the secret side-path with the Rusted Key', this.v(1775), height - this.v(170), this.v(62), this.v(84), 0x6b5b48);
+    this.addInteractable('great_gate', 'Great Gate',
+      'Blast or force the Great Gate', this.v(1915), height - this.v(210), this.v(110), this.v(230), 0x312e81);
   }
 
-  private buildOutskirts(height: number, palette: { floor: number; accent: number }) {
-    this.addPlatform(520, height - 225, 320, 28, 0x3f4d40);
-    this.addPlatform(870, height - 310, 220, 28, 0x4c5b4f);
-    this.addPlatform(1330, height - 205, 300, 28, 0x3f4d40);
-    this.addFogTrees([260, 540, 900, 1240, 1630, 1960], height, palette.accent);
-    this.addInteractable('envoy_final', 'Nightshade Envoy', 'Ask what the Darkness truly was', 1350, height - 160, 62, 116, 0x312e81);
-    this.add.text(1770, height - 210, 'Walk into the fog', {
+  private buildOutskirts(height: number) {
+    this.addPlatform(this.v(520), height - this.v(225), this.v(320), this.v(28), 0x3f4d40);
+    this.addPlatform(this.v(870), height - this.v(310), this.v(220), this.v(28), 0x4c5b4f);
+    this.addPlatform(this.v(1330), height - this.v(205), this.v(300), this.v(28), 0x3f4d40);
+    this.addInteractable('envoy_final', 'Nightshade Envoy',
+      'Ask what the Darkness truly was', this.v(1350), height - this.v(160), this.v(62), this.v(116), 0x312e81);
+    this.add.text(this.v(1770), height - this.v(210), 'Walk into the fog', {
       fontFamily: 'VT323, monospace',
-      fontSize: '28px',
+      fontSize: `${Math.round(this.v(28))}px`,
       color: '#dce7df',
       stroke: '#050408',
-      strokeThickness: 4,
+      strokeThickness: this.v(4),
     });
   }
 
-  private drawAtmosphere(scene: StorySceneId, palette: { sky: number; back: number; accent: number }) {
+  // ── Shared helpers ───────────────────────────────────────────────────────────
+
+  private drawAtmosphere(scene: StorySceneId, palette: { sky: number; back: number; accent: number }, bgWidth: number) {
     const { height } = this.scale;
-    const worldHeight = height + 500;
-    this.add.rectangle(1100, worldHeight * 0.5, 2200, worldHeight, palette.sky, 0.12);
-
+    const ax = bgWidth / 2;
+    this.add.rectangle(ax, height / 2, bgWidth, height, palette.sky, 0.12)
+      .setScrollFactor(1, 0);
     if (scene === 'outskirts') {
-      const baseY = height - 160;
-      this.add.rectangle(1100, baseY - 85, 2200, 210, 0xced7cf, 0.12);
+      this.add.rectangle(ax, height - this.v(160) - this.v(85), bgWidth, this.v(210), 0xced7cf, 0.12)
+        .setScrollFactor(1, 0);
     }
-
     if (scene === 'market' || scene === 'cathedral') {
-      this.add.rectangle(1100, worldHeight * 0.5, 2200, worldHeight, palette.accent, 0.05).setBlendMode(Phaser.BlendModes.ADD);
+      this.add.rectangle(ax, height / 2, bgWidth, height, palette.accent, 0.05)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setScrollFactor(1, 0);
     }
   }
 
-  private addPlatform(x: number, y: number, width: number, height: number, color: number, alpha: number = 1) {
-    const platform = this.add.rectangle(x, y, width, height, color, alpha);
-    if (alpha > 0) {
-      platform.setStrokeStyle(2, 0x0b0810, 0.8);
-    }
-    this.physics.add.existing(platform, true);
-    this.platforms.add(platform);
+  private addPlatform(x: number, y: number, w: number, h: number, color: number, alpha = 1) {
+    const plat = this.add.rectangle(x, y, w, h, color, alpha);
+    if (alpha > 0) plat.setStrokeStyle(this.v(2), 0x0b0810, 0.8);
+    this.physics.add.existing(plat, true);
+    this.platforms.add(plat);
+  }
+
+  private syncPlayerBodyToFrame() {
+    if (!this.player?.body) return;
+
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    // Character Look: Stable 120x680 hitbox for 800x800 frames
+    body.setSize(120, 680); 
+    body.setOffset(340, 120); 
   }
 
   private addInteractable(
-    id: string,
-    name: string,
-    hint: string,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    color: number,
+    id: string, name: string, hint: string,
+    x: number, y: number, w: number, h: number,
+    color: number, alpha = 0.9, labelX?: number, labelY?: number,
   ) {
-    const rect = this.add.rectangle(x, y, width, height, color, 0.9).setStrokeStyle(3, 0xf7d27d, 0.45);
-    rect.setInteractive({ useHandCursor: true });
-    rect.on('pointerdown', () => {
-      this.emitAction(id.startsWith('collect_') ? { type: 'collect', target: id } : { type: 'interact', target: id });
-    });
-    const label = this.add.text(x, y - height / 2 - 28, name, {
+    const rect = this.add.rectangle(x, y, w, h, color, alpha)
+      .setStrokeStyle(this.v(3), 0xf7d27d, alpha > 0 ? 0.45 : 0.0)
+      .setDepth(19);
+    const label = this.add.text(labelX ?? x, labelY ?? (y - h / 2 - this.v(28)), name, {
       fontFamily: 'VT323, monospace',
-      fontSize: '24px',
+      fontSize: `${Math.round(this.v(24))}px`,
       color: '#f8e5b3',
       stroke: '#050408',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+      strokeThickness: this.v(4),
+    }).setOrigin(0.5).setDepth(25).setVisible(false);
     this.interactables.push({ id, name, hint, rect, label });
   }
 
   private refreshVisibility(state: StoryState) {
     for (const item of this.interactables) {
+      const hasKey = state.inventory.includes('rusted_key');
       const hidden =
-        (item.id === 'rat' && state.flags.ratDistracted) ||
-        (item.id === 'collect_dagger' && !state.flags.ratDistracted) ||
-        (item.id === 'collect_dagger' && state.inventory.includes('iron_dagger')) ||
+        (item.id === 'rat' && state.flags.ratPaid) ||
+        (item.id === 'kaelen' && hasKey) ||
+        (item.id === 'cell_exit' && !hasKey) ||
         (item.id === 'collect_coin' && state.flags.coinFound) ||
-        (item.id === 'cell_exit' && !state.inventory.includes('iron_dagger') && !state.inventory.includes('rusted_key')) ||
         (item.id === 'market_exit' && !state.inventory.includes('gate_pass')) ||
         (item.id === 'cathedral_exit' && state.scene === 'cathedral' && !state.flags.runeTaken && state.flags.silasChoice === 'none');
 
       item.rect.setVisible(!hidden);
-      item.label.setVisible(!hidden);
-      if (hidden) {
-        item.rect.disableInteractive();
-      } else if (!item.rect.input) {
-        item.rect.setInteractive({ useHandCursor: true });
-      }
+      if (hidden) item.label.setVisible(false);
+    }
+
+    const ratVis = this.children.getByName('rat_visual') as Phaser.GameObjects.Image | null;
+    if (ratVis) ratVis.setVisible(!state.flags.ratPaid);
+
+    if (state.scene === 'cell' && this.bgImage) {
+      const wantKey = state.inventory.includes('rusted_key') ? 'bg_cell_open' : 'bg_cell';
+      if (this.bgImage.texture.key !== wantKey) this.bgImage.setTexture(wantKey);
     }
   }
 
   private updateNearestInteractable() {
     let nearest: Interactable | undefined;
-    let nearestDistance = 9999;
+    let nearestDist = 9999;
+
+    // Hide all labels first
+    for (const item of this.interactables) {
+      item.label.setVisible(false);
+    }
 
     for (const item of this.interactables) {
       if (!item.rect.visible) continue;
-      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.rect.x, item.rect.y);
-      if (distance < 190 && distance < nearestDistance) {
-        nearest = item;
-        nearestDistance = distance;
-      }
+      const dist = Phaser.Math.Distance.Between(
+        this.player.x, this.player.y, item.rect.x, item.rect.y,
+      );
+      if (dist < this.v(190) && dist < nearestDist) { nearest = item; nearestDist = dist; }
     }
 
     this.near = nearest;
-    this.prompt.setText(nearest ? `E - ${nearest.hint}` : '');
+    if (nearest) {
+      this.prompt.setText(`[E]  ${nearest.hint}`);
+      nearest.label.setVisible(true);
+    } else {
+      this.prompt.setText('');
+    }
   }
 
   private emitAction(action: GameAction) {
@@ -450,46 +585,16 @@ export class GameScene extends Phaser.Scene {
   private handleResize(gameSize: Phaser.Structs.Size) {
     const { width, height } = gameSize;
     const worldHeight = this.getWorldHeight();
-    this.physics.world.setBounds(0, 0, 2200, worldHeight);
-    this.cameras.main.setBounds(0, 0, 2200, worldHeight);
+    this.physics.world.setBounds(0, 0, this.physics.world.bounds.width, worldHeight);
+    this.cameras.main.setBounds(0, 0, this.cameras.main.getBounds().width, height);
     this.cameras.main.setSize(width, height);
-    this.rebuildScene(this.currentState!);
+    if (this.currentState) this.rebuildScene(this.currentState);
   }
 
   private sceneStartX(scene: StorySceneId) {
+    if (scene === 'cell') return 200;
     if (scene === 'gate') return 180;
     if (scene === 'outskirts') return 140;
-    if (scene === 'cell') return 360;
     return 130;
-  }
-
-  private drawBars(x: number, y: number) {
-    this.add.rectangle(x, y, 300, 210, 0x111827, 0.35).setStrokeStyle(4, 0x9ca3af, 0.55);
-    for (let i = -4; i <= 4; i += 1) {
-      this.add.rectangle(x + i * 30, y, 8, 210, 0x9ca3af, 0.5);
-    }
-  }
-
-  private addLanterns(xs: number[], height: number, color: number) {
-    xs.forEach((x) => {
-      this.add.rectangle(x, height - 360, 8, 180, 0x22162e, 0.8);
-      this.add.circle(x, height - 250, 28, color, 0.5);
-      this.add.circle(x, height - 250, 70, color, 0.08);
-    });
-  }
-
-  private addGothicWindows(xs: number[], height: number, color: number) {
-    xs.forEach((x) => {
-      this.add.triangle(x, height - 390, 0, 110, 42, 0, 84, 110, color, 0.13);
-      this.add.rectangle(x, height - 300, 84, 170, color, 0.1).setStrokeStyle(2, color, 0.18);
-    });
-  }
-
-  private addFogTrees(xs: number[], height: number, color: number) {
-    xs.forEach((x, index) => {
-      this.add.rectangle(x, height - 210, 28, 220 + index * 8, 0x16241a, 0.7);
-      this.add.circle(x, height - 335, 70, 0x223629, 0.55);
-      this.add.circle(x + 36, height - 300, 62, color, 0.06);
-    });
   }
 }

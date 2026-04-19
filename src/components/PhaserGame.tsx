@@ -5,18 +5,37 @@ import type { GameAction, StoryState } from '../game/storyTypes';
 
 interface PhaserGameProps {
   storyState: StoryState;
+  uiVisible?: boolean;
   onGameAction: (action: GameAction) => void;
+  onToggleUI?: () => void;
+  onToggleInventory?: () => void;
   onGameReady?: (game: Phaser.Game) => void;
 }
 
-export const PhaserGame: React.FC<PhaserGameProps> = ({ storyState, onGameAction, onGameReady }) => {
+export const PhaserGame: React.FC<PhaserGameProps> = ({ 
+  storyState, 
+  uiVisible = true, 
+  onGameAction, 
+  onToggleUI,
+  onToggleInventory,
+  onGameReady 
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
   const actionRef = useRef(onGameAction);
+  const toggleUIRef = useRef(onToggleUI);
+  const toggleInventoryRef = useRef(onToggleInventory);
 
   useEffect(() => {
     actionRef.current = onGameAction;
-  }, [onGameAction]);
+    toggleUIRef.current = onToggleUI;
+    toggleInventoryRef.current = onToggleInventory;
+  }, [onGameAction, onToggleUI, onToggleInventory]);
+
+  useEffect(() => {
+    if (!gameRef.current) return;
+    gameRef.current.events.emit('ui_visibility', uiVisible);
+  }, [uiVisible]);
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -49,6 +68,14 @@ export const PhaserGame: React.FC<PhaserGameProps> = ({ storyState, onGameAction
 
       game.events.on('game_action', (action: GameAction) => {
         actionRef.current(action);
+      });
+
+      game.events.on('toggle_ui', () => {
+        toggleUIRef.current?.();
+      });
+
+      game.events.on('toggle_inventory', () => {
+        toggleInventoryRef.current?.();
       });
     } catch (e) {
       console.error('CRITICAL: Phaser failed to initialize.', e);

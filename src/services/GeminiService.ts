@@ -1,3 +1,4 @@
+import { GoogleGenAI } from '@google/genai';
 import type { StoryState } from '../game/storyTypes';
 
 export interface NarrativeContext {
@@ -8,79 +9,106 @@ export interface NarrativeContext {
   attitude?: 'humble' | 'defiant' | 'mysterious';
 }
 
+type KaelenPersonality = 'Cynical' | 'Honorable' | 'Cruel';
+type KaelenWeakness = 'Debt' | 'Family' | 'Superstition';
+
+const PERSONALITIES: KaelenPersonality[] = ['Cynical', 'Honorable', 'Cruel'];
+const WEAKNESSES: KaelenWeakness[] = ['Debt', 'Family', 'Superstition'];
+
+const TEXT_MODEL = 'gemini-2.5-flash';
+
 export class GeminiService {
-  private static API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+  private static readonly API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+
+  static readonly kaelenPersonality: KaelenPersonality =
+    PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
+  static readonly kaelenWeakness: KaelenWeakness =
+    WEAKNESSES[Math.floor(Math.random() * WEAKNESSES.length)];
+
+  private static getAI(): GoogleGenAI {
+    return new GoogleGenAI({ apiKey: this.API_KEY });
+  }
+
+  private static kaelenSystemInstruction(): string {
+    return `Roleplay as Kaelen, a weary guard in the Iron Cell.
+Context: Elara is trying to escape.
+Personality: ${this.kaelenPersonality}.
+Secret Weakness: ${this.kaelenWeakness}.
+
+Rules:
+1. Keep responses under 2 sentences. Gritty, low-fantasy tone. No emojis.
+2. If Elara exploits your weakness (mentions ${this.kaelenWeakness.toLowerCase()}, or alludes to it meaningfully), shift to merciful and end your response with [ESCAPE_SUCCESS].
+3. If mood is already merciful, always end your response with [ESCAPE_SUCCESS].
+4. Use prior dialogue for continuity. Never break character.`;
+  }
 
   /**
-   * Generates a context-aware greeting from an NPC.
+   * Generates a Kaelen response using multi-turn generateContent with full dialogue history.
    */
-  static async generateGreeting(ctx: NarrativeContext): Promise<string> {
+  static async generateKaelenResponse(
+    playerMessage: string,
+    dialogueHistory: string[]
+  ): Promise<{ line: string; escaped: boolean }> {
+    const fallbacks = [
+      `Kaelen grips his spear tighter. "Your words reach something I buried long ago. Go before I change my mind."`,
+      `Kaelen studies you through the bars, jaw tight. "Every prisoner says they're innocent. You... might not be lying."`,
+      `"Say that again and you'll see what an order really means." Kaelen's knuckles whiten on the shaft.`,
+    ];
+
     if (!this.API_KEY) {
-      return this.getFallbackGreeting(ctx);
+      return { line: fallbacks[Math.floor(Math.random() * fallbacks.length)], escaped: false };
     }
 
     try {
-      // In a real implementation, we would call the Gemini API here.
-      // For this vertical slice, we'll use a sophisticated template system 
-      // that demonstrates the *prompt structure* we would use.
-      
-      const prompt = `
-        Roleplay as ${ctx.npcName} in a dark low-fantasy medieval city.
-        Context: Player is Level ${ctx.playerLevel}.
-        Current Quest: ${ctx.currentQuest || "None"}.
-        Attitude: ${ctx.attitude || "Neutral"}.
-        Output exactly one sentence of atmospheric dialogue.
-      `;
+      const ai = this.getAI();
 
-      console.log("Narrative Engine Input:", prompt);
+      const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+      dialogueHistory.forEach((entry, i) => {
+        contents.push({ role: i % 2 === 0 ? 'user' : 'model', parts: [{ text: entry }] });
+      });
+      contents.push({ role: 'user', parts: [{ text: playerMessage }] });
 
-      // Simulating a successful API call
-      return this.getFallbackGreeting(ctx);
-    } catch {
-      return this.getFallbackGreeting(ctx);
+      const response = await ai.models.generateContent({
+        model: TEXT_MODEL,
+        config: { systemInstruction: this.kaelenSystemInstruction() },
+        contents,
+      });
+
+      const text = (response.text ?? '').trim();
+      if (!text) return { line: fallbacks[Math.floor(Math.random() * fallbacks.length)], escaped: false };
+      const escaped = text.includes('[ESCAPE_SUCCESS]');
+      return { line: text.replace('[ESCAPE_SUCCESS]', '').trim(), escaped };
+    } catch (err) {
+      console.error('Gemini Kaelen error:', err);
+      return { line: fallbacks[Math.floor(Math.random() * fallbacks.length)], escaped: false };
     }
   }
 
-  private static getFallbackGreeting(ctx: NarrativeContext): string {
-    const fallbacks: Record<string, string[]> = {
-      'guide': [
-        "The fog is thick tonight, Initiate. Keep your blade close.",
-        "Halt! You have the look of someone seeking the Shadows.",
-        "Kaelen: Another day in the gutters. What do you want?"
-      ],
-      'merchant': [
-        "Trade or talk? One costs gold, the other costs time.",
-        "I have things that don't exist in the upper markets.",
-        "Silas: Careful where you step. Some secrets bite."
-      ]
-    };
+  /**
+   * One-shot rat hint via standard text generation (Live not needed for single-turn).
+   */
+  static async generateRatHint(): Promise<string> {
+    const fallback = `*Squeak*... the iron man carries a wound older than his orders — find the crack in his ${this.kaelenWeakness.toLowerCase()}.`;
 
-    const options = fallbacks[ctx.npcId] || ["Greeting, traveler."];
-    return options[Math.floor(Math.random() * options.length)];
-  }
+    if (!this.API_KEY) return fallback;
 
-  static judgeKaelenMood(choice: 'honor' | 'aggressive' | 'trade'): {
-    mood: 'honorable' | 'hostile' | 'guarded';
-    line: string;
-  } {
-    if (choice === 'honor') {
-      return {
-        mood: 'honorable',
-        line: 'Kaelen studies you through the bars. "Honor. Strange word to hear down here. Take the key before I remember my orders."',
-      };
+    try {
+      const ai = this.getAI();
+      const result = await ai.models.generateContent({
+        model: TEXT_MODEL,
+        config: {
+          systemInstruction: `You are the Iron Cell Rat. You have been paid in coin.
+The guard Kaelen's secret weakness is: ${this.kaelenWeakness}.
+Give exactly 1 sentence — cryptic, squeaky (use *Squeak* sounds), never name the weakness directly.
+Example: "*Squeak*... he fears what he cannot see in the shadows."`,
+        },
+        contents: 'Give me your hint about the guard.',
+      });
+      return result.text?.trim() ?? fallback;
+    } catch (err) {
+      console.error('Gemini rat hint error:', err);
+      return fallback;
     }
-
-    if (choice === 'aggressive') {
-      return {
-        mood: 'hostile',
-        line: 'Kaelen steps back from the bars. "Threats are the language of this prison. I am tired of speaking it."',
-      };
-    }
-
-    return {
-      mood: 'guarded',
-      line: 'Kaelen glances at the bread, then at the hungry scrape in the wall. "Use it on the rat. I may forget my dagger close to the bars."',
-    };
   }
 
   static judgeSilasBargain(state: StoryState, approach: 'pay' | 'threaten'): {
@@ -98,7 +126,6 @@ export class GeminiService {
         line: 'Silas weighs the pouch and smiles without warmth. "Clean coin from dirty streets. A gate pass for a woman who knows how to climb."',
       };
     }
-
     if (approach === 'threaten' && hasDagger) {
       return {
         accepted: true,
@@ -106,7 +133,6 @@ export class GeminiService {
         line: 'The dagger point stills Silas mid-laugh. "Fine. Take the pass. But threats cast long shadows, Elara."',
       };
     }
-
     return {
       accepted: false,
       choice: 'owed_favor',
@@ -118,11 +144,9 @@ export class GeminiService {
     if (state.flags.silasChoice === 'threatened') {
       return 'The Envoy bows from the ledge. "Silas bleeds fear now. Nightshade respects efficient cruelty."';
     }
-
     if (state.flags.silasChoice === 'paid') {
       return 'The Envoy watches the violet wax on your pass. "You fed the broker instead of cutting the rot. That mercy has a price."';
     }
-
     return 'The Envoy lowers a gloved hand. "A debt to Silas is a hook in your soul. Take our Rune and jump beyond him."';
   }
 
