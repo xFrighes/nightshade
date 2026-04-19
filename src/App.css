@@ -975,7 +975,7 @@
 
 .ui-portrait {
   position: fixed;
-  left: 5.5%;
+  left: 5.25%;
   top: 8.5%;
   height: 15.5%;
   z-index: 40;
@@ -1095,6 +1095,53 @@
   gap: 0.5vw;
   padding: 0 0.4vw;
   pointer-events: auto;
+}
+
+.ui-settings-hitbox,
+.ui-inventory-hitbox,
+.ui-story-log-hitbox,
+.ui-reset-hitbox {
+  position: fixed;
+  z-index: 100;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.ui-settings-hitbox {
+  right: 3.15%;
+  top: 28.75%;
+  width: 60px;
+  height: 60px;
+}
+
+.ui-inventory-hitbox {
+  right: 14.2%;
+  top: 28.75%;
+  width: 60px;
+  height: 60px;
+}
+
+.ui-story-log-hitbox {
+  right: 10.5%;
+  top: 28.75%;
+  width: 60px;
+  height: 60px;
+}
+
+.ui-reset-hitbox {
+  right: 6.8%;
+  top: 28.75%;
+  width: 60px;
+  height: 60px;
+}
+
+.ui-settings-hitbox:hover,
+.ui-inventory-hitbox:hover,
+.ui-story-log-hitbox:hover,
+.ui-reset-hitbox:hover {
+  background: rgba(128, 128, 128, 0.4);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .ui-icon-btn {
@@ -1238,6 +1285,35 @@
   right: calc(3.5vw - 0.5rem);
   z-index: 0;
   background: #08060d;
+}
+
+.ui-interaction-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 12vh;
+  transform: translateX(-50%);
+  z-index: 100;
+  font-family: 'VT323', monospace;
+  font-size: clamp(20px, 2.5vw, 32px);
+  color: #f5d78e;
+  background: rgba(5, 4, 8, 0.85);
+  padding: 8px 16px;
+  border: 1px solid #f9d27d;
+  pointer-events: none;
+  text-shadow: 2px 2px 0 #000;
+  animation: promptPop 0.2s ease-out;
+}
+
+@keyframes promptPop {
+  0% {
+    transform: translateX(-50%) scale(0.9);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
 }
 
 /* ── HUD entrance animations ─────────────────────────── */

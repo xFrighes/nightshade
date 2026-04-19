@@ -6,6 +6,7 @@ type Tab = 'AUDIO' | 'VIDEO' | 'GAMEPLAY' | 'CONTROLS';
 interface SettingsWindowProps {
   isOpen: boolean;
   onClose: () => void;
+  isGameStarted?: boolean;
 }
 
 const SCALE = 1.1;
@@ -21,7 +22,7 @@ const CONTENT_BOTTOM = 56 * SCALE;
 
 const TABS: Tab[] = ['AUDIO', 'VIDEO', 'GAMEPLAY', 'CONTROLS'];
 
-export const SettingsWindow: React.FC<SettingsWindowProps> = ({ isOpen, onClose }) => {
+export const SettingsWindow: React.FC<SettingsWindowProps> = ({ isOpen, onClose, isGameStarted = false }) => {
   const [activeTab, setActiveTab] = useState<Tab>('AUDIO');
   const [settings, setSettings] = useState<SettingsState>(gameStore.getSettings());
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null);
@@ -230,7 +231,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ isOpen, onClose 
           }}
         >
           <span style={{ fontSize: 16 * SCALE, lineHeight: 1, marginTop: -2 * SCALE }}>«</span>
-          BACK TO MENU
+          {isGameStarted ? 'BACK TO GAME' : 'BACK TO MENU'}
         </button>
       </div>
     </div>
@@ -272,13 +273,18 @@ type ValueCyclerProps<T extends string | boolean> = {
 };
 
 const ValueCycler = <T extends string | boolean>({ value, options, labels, onChange, scale }: ValueCyclerProps<T>) => {
+  const valueIdx = options.indexOf(value);
+  const displayIdx = valueIdx >= 0 ? valueIdx : 0;
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextIdx = (options.indexOf(value) + 1) % options.length;
+    const nextIdx = (displayIdx + 1) % options.length;
     onChange(options[nextIdx]);
   };
   
-  const displayValue = labels ? labels[options.indexOf(value)] : String(value);
+  const displayValue = valueIdx >= 0
+    ? (labels ? labels[displayIdx] : String(value))
+    : String(value);
 
   return (
     <span 
@@ -380,7 +386,34 @@ const ControlsTab: React.FC<{
   settings: SettingsState['controls'], scale: number, 
   highlightedRow: number | null, onHighlight: (i: number) => void, onUpdate: (u: Partial<SettingsState['controls']>) => void
 }> = ({ settings, scale, highlightedRow, onHighlight, onUpdate }) => {
+  const [listeningFor, setListeningFor] = useState<string | null>(null);
   const valStyle = { fontFamily: "'Press Start 2P', monospace", fontSize: 13 * scale, color: '#b0a080', letterSpacing: '0.03em' };
+
+  useEffect(() => {
+    if (!listeningFor) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.key === 'Escape') {
+        setListeningFor(null);
+        return;
+      }
+
+      onUpdate({
+        keyBindings: {
+          ...settings.keyBindings,
+          [listeningFor]: normalizeBindingKey(event),
+        },
+      });
+      setListeningFor(null);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [listeningFor, onUpdate, settings.keyBindings]);
+
   return (
     <div style={{ padding: `${8 * scale}px 0` }}>
       <SettingRow label="Invert Y-Axis" idx={0} highlightedRow={highlightedRow} onHighlight={onHighlight} scale={scale}>
@@ -395,16 +428,30 @@ const ControlsTab: React.FC<{
       </div>
       {Object.entries(settings.keyBindings).map(([action, key], i) => (
         <SettingRow key={action} label={action.replace(/([A-Z])/g, ' $1').toUpperCase()} idx={i + 2} highlightedRow={highlightedRow} onHighlight={onHighlight} scale={scale}>
-          <div style={{ 
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setListeningFor(action);
+            }}
+            style={{ 
             background: '#1a1008', border: '1px solid #4a3020', padding: `${8 * scale}px ${16 * scale}px`,
-            color: '#d4c0a0', fontFamily: 'monospace', fontSize: 14 * scale
+            color: listeningFor === action ? '#ffe0a0' : '#d4c0a0', fontFamily: 'monospace', fontSize: 14 * scale,
+            minWidth: 78 * scale, textAlign: 'center', cursor: 'pointer',
           }}>
-            {key}
-          </div>
+            {listeningFor === action ? '...' : key}
+          </button>
         </SettingRow>
       ))}
     </div>
   );
+};
+
+const normalizeBindingKey = (event: KeyboardEvent) => {
+  if (event.code === 'Space') return 'Space';
+  if (event.key.startsWith('Arrow')) return event.key;
+  if (event.key.length === 1) return event.key.toUpperCase();
+  return event.key;
 };
 
 

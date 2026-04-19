@@ -54,6 +54,8 @@ export type SettingsState = {
   };
 };
 
+export type ControlAction = keyof SettingsState['controls']['keyBindings'];
+
 export type WorldLogEntry = {
   id: string;
   timestamp: number;
@@ -80,12 +82,21 @@ const INITIAL_STATE: PlayerState = {
   ]
 };
 
+export const DEFAULT_KEY_BINDINGS: Record<string, string> = {
+  moveUp: 'W',
+  moveDown: 'S',
+  moveLeft: 'A',
+  moveRight: 'D',
+  interact: 'E',
+  inventory: 'I',
+};
+
 const INITIAL_SETTINGS: SettingsState = {
   audio: {
     masterVolume: 0.8,
     musicVolume: 0.6,
     voiceActing: true,
-    audioQuality: 'Medium / High',
+    audioQuality: 'High',
     subtitles: true,
     language: 'English',
   },
@@ -105,16 +116,27 @@ const INITIAL_SETTINGS: SettingsState = {
   controls: {
     invertY: false,
     mouseSensitivity: 0.5,
-    keyBindings: {
-      moveUp: 'W',
-      moveDown: 'S',
-      moveLeft: 'A',
-      moveRight: 'D',
-      interact: 'E',
-      inventory: 'I',
-    },
+    keyBindings: DEFAULT_KEY_BINDINGS,
   },
 };
+
+const mergeSettings = (saved: Partial<SettingsState> | null): SettingsState => ({
+  audio: {
+    ...INITIAL_SETTINGS.audio,
+    ...saved?.audio,
+    audioQuality: saved?.audio?.audioQuality === 'Medium / High' ? 'High' : saved?.audio?.audioQuality ?? INITIAL_SETTINGS.audio.audioQuality,
+  },
+  video: { ...INITIAL_SETTINGS.video, ...saved?.video },
+  gameplay: { ...INITIAL_SETTINGS.gameplay, ...saved?.gameplay },
+  controls: {
+    ...INITIAL_SETTINGS.controls,
+    ...saved?.controls,
+    keyBindings: {
+      ...DEFAULT_KEY_BINDINGS,
+      ...saved?.controls?.keyBindings,
+    },
+  },
+});
 
 class GameStore extends EventTarget {
   private state: PlayerState = { ...INITIAL_STATE };
@@ -186,7 +208,7 @@ class GameStore extends EventTarget {
     const savedSettings = localStorage.getItem('nightshade_settings');
     if (savedSettings) {
       try {
-        this.settings = { ...INITIAL_SETTINGS, ...JSON.parse(savedSettings) };
+        this.settings = mergeSettings(JSON.parse(savedSettings));
       } catch (e) {
         console.error('Failed to load settings data', e);
       }

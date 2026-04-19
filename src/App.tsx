@@ -1,9 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { ChevronRight, KeyRound, Loader2, Package, RotateCcw, Shield, Sparkles, Wallet, X } from 'lucide-react';
 import { PhaserGame } from './components/PhaserGame';
 import { SettingsWindow } from './components/SettingsWindow';
+import { StoryLogWindow } from './components/StoryLogWindow';
 import { GeminiService } from './services/GeminiService';
 import { SolanaService } from './services/SolanaService';
+import { gameStore, type SettingsState } from './store/gameStore';
+import {
+  ALL_ASSET_URLS,
+  GAME_SHELL_ASSET_URLS,
+  MENU_ASSET_URLS,
+  preloadBrowserAssets,
+  warmBrowserAssetCache,
+} from './game/assetManifest';
 import {
   INITIAL_STORY_STATE,
   STORY_ITEMS,
@@ -30,9 +39,21 @@ type DialogState = {
 
 type CombatState = {
   kaelen: number;
+  kaelenMax: number;
   elara: number;
+  elaraMax: number;
   message: string;
 };
+
+const DIFFICULTY_RULES: Record<string, { kaelenHealth: number; strikeDamage: number; counterDamage: number; guardHeal: number }> = {
+  Story: { kaelenHealth: 4, strikeDamage: 3, counterDamage: 0, guardHeal: 2 },
+  Easy: { kaelenHealth: 5, strikeDamage: 3, counterDamage: 1, guardHeal: 2 },
+  Normal: { kaelenHealth: 6, strikeDamage: 2, counterDamage: 1, guardHeal: 1 },
+  Hard: { kaelenHealth: 8, strikeDamage: 2, counterDamage: 2, guardHeal: 1 },
+  Nightmare: { kaelenHealth: 10, strikeDamage: 1, counterDamage: 2, guardHeal: 1 },
+};
+
+const getDifficultyRules = (difficulty: string) => DIFFICULTY_RULES[difficulty] ?? DIFFICULTY_RULES.Normal;
 
 const formatKaelenGeminiError = (err: unknown): string => {
   const message = err instanceof Error ? err.message : 'Gemini failed to answer.';
@@ -44,6 +65,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isPreloaded, setIsPreloaded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isStoryLogOpen, setIsStoryLogOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [story, setStory] = useState<StoryState>(() => loadStory());
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
@@ -54,29 +77,103 @@ const App: React.FC = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [showReveal, setShowReveal] = useState(false);
   const [hudKey, setHudKey] = useState(0);
+  const [staminaPercent, setStaminaPercent] = useState(1);
+  const [interactionPrompt, setInteractionPrompt] = useState('');
+  const [gameShellProgress, setGameShellProgress] = useState(0);
+  const [gameShellReady, setGameShellReady] = useState(false);
+  const [phaserProgress, setPhaserProgress] = useState(0);
+  const [phaserAssetsReady, setPhaserAssetsReady] = useState(false);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<SettingsState>(() => gameStore.getSettings());
   const storyRef = React.useRef(story);
-  storyRef.current = story;
 
   useEffect(() => {
-    const images = ['/starting-screen.png', '/bg.png', '/UI.png'];
-    let loadedCount = 0;
-    images.forEach(src => {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === images.length) setIsPreloaded(true);
-      };
-      img.onerror = () => {
-        loadedCount++;
-        if (loadedCount === images.length) setIsPreloaded(true);
-      };
+    storyRef.current = story;
+  }, [story]);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const applyFullscreenPreference = React.useCallback((enabled: boolean) => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      msFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void>;
+      msExitFullscreen?: () => Promise<void>;
+    };
+    const docEl = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      msRequestFullscreen?: () => Promise<void>;
+    };
+    const fullscreenElement = document.fullscreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement;
+
+    if (enabled && !fullscreenElement) {
+      const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+      request?.call(docEl)?.catch((err: Error) => {
+        console.warn(`Error attempting to enable fullscreen mode: ${err.message}`);
+      });
+      return;
+    }
+
+    if (!enabled && fullscreenElement) {
+      const exit = document.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+      exit?.call(document)?.catch((err: Error) => {
+        console.warn(`Error attempting to exit fullscreen mode: ${err.message}`);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/soundtrack.mp3');
+      audioRef.current.loop = true;
+    }
+    audioRef.current.play().catch(e => {
+      // This is expected if user hasn't interacted yet
+      console.log('Audio autoplay blocked, waiting for interaction');
     });
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('shadow_toll_story', JSON.stringify(story));
-  }, [story]);
+    const handleSettingsChange = (event: Event) => {
+      const nextSettings = (event as CustomEvent<SettingsState>).detail;
+      setSettings(nextSettings);
+      applyFullscreenPreference(nextSettings.video.fullscreen);
+    };
+    gameStore.addEventListener('settingsChange', handleSettingsChange);
+    return () => {
+      gameStore.removeEventListener('settingsChange', handleSettingsChange);
+    };
+  }, [applyFullscreenPreference]);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+    audioRef.current.volume = settings.audio.masterVolume * settings.audio.musicVolume;
+  }, [settings.audio.masterVolume, settings.audio.musicVolume]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    preloadBrowserAssets(MENU_ASSET_URLS)
+      .then(() => {
+        if (cancelled) return;
+        setIsPreloaded(true);
+        void warmBrowserAssetCache(ALL_ASSET_URLS);
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to preload menu assets:', error);
+        if (!cancelled) setIsPreloaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (settings.gameplay.autoSave) {
+      localStorage.setItem('shadow_toll_story', JSON.stringify(story));
+    }
+  }, [story, settings.gameplay.autoSave]);
 
   // Opening monologue — fires once after the Phaser intro fades
   useEffect(() => {
@@ -84,9 +181,19 @@ const App: React.FC = () => {
     if (story.scene !== 'cell' || story.dialogueHistory.length > 0) return;
     const timer = setTimeout(() => {
       setOpeningShown(true);
+      const text = 'Cold stone. Iron bars. My breath fogs the dark. Nothing in my hands.\n\nKaelen is on watch through the bars. There has to be a way out of here.';
+      updateStory(state => ({
+        ...state,
+        fullHistory: [...(state.fullHistory || []), {
+          speaker: 'Elara',
+          text,
+          timestamp: Date.now(),
+          type: 'dialogue'
+        }]
+      }));
       setDialog({
         speaker: 'Elara',
-        text: 'Cold stone. Iron bars. My breath fogs the dark. Nothing in my hands.\n\nKaelen is on watch through the bars. There has to be a way out of here.',
+        text,
         options: [{ label: 'Look for a way out', action: () => setDialog(null) }],
       });
     }, 4000);
@@ -104,21 +211,16 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const enterFullscreen = () => {
-    const docEl = document.documentElement as any;
-    const request = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
-    const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).msFullscreenElement;
-
-    if (!fullscreenElement && request) {
-      request.call(docEl).catch((err: any) => {
-        console.warn(`Error attempting to enable fullscreen mode: ${err.message}`);
-      });
-    }
-  };
+  const enterFullscreen = React.useCallback(() => {
+    applyFullscreenPreference(settings.video.fullscreen);
+  }, [applyFullscreenPreference, settings.video.fullscreen]);
 
   useEffect(() => {
     const handleInitialInteraction = () => {
       enterFullscreen();
+      if (audioRef.current && audioRef.current.paused) {
+        audioRef.current.play().catch(e => console.warn('Audio playback blocked:', e));
+      }
       document.removeEventListener('mousedown', handleInitialInteraction);
       document.removeEventListener('keydown', handleInitialInteraction);
     };
@@ -128,7 +230,7 @@ const App: React.FC = () => {
       document.removeEventListener('mousedown', handleInitialInteraction);
       document.removeEventListener('keydown', handleInitialInteraction);
     };
-  }, []);
+  }, [enterFullscreen]);
 
   const inventory = useMemo(() => story.inventory.map((id) => STORY_ITEMS[id]), [story.inventory]);
 
@@ -139,6 +241,12 @@ const App: React.FC = () => {
   const addLog = (state: StoryState, entry: string): StoryState => ({
     ...state,
     log: [entry, ...state.log].slice(0, 8),
+    fullHistory: [...(state.fullHistory || []), {
+      speaker: 'System',
+      text: entry,
+      timestamp: Date.now(),
+      type: 'system',
+    }],
   });
 
   const hasItem = (id: StoryItemId) => story.inventory.includes(id);
@@ -153,9 +261,15 @@ const App: React.FC = () => {
     inventory: state.inventory.filter((item) => item !== id),
   });
 
-  const recordChoice = (state: StoryState, choice: string): StoryState => ({
+  const recordChoice = (state: StoryState, choice: string, speaker = 'Elara'): StoryState => ({
     ...state,
     dialogueHistory: [...state.dialogueHistory, choice].slice(-20),
+    fullHistory: [...(state.fullHistory || []), {
+      speaker,
+      text: choice,
+      timestamp: Date.now(),
+      type: 'dialogue',
+    }],
   });
 
   const goToScene = (scene: StorySceneId, entry: string) => {
@@ -269,8 +383,7 @@ const App: React.FC = () => {
     });
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleCellKaelenInput = React.useCallback(async (playerLine: string) => {
+  async function handleCellKaelenInput(playerLine: string) {
     setIsAiLoading(true);
     setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
     try {
@@ -278,13 +391,24 @@ const App: React.FC = () => {
         playerLine, storyRef.current.dialogueHistory,
       );
       updateStory(state => recordChoice(state, playerLine));
+      const npcLine = line || "Kaelen slides a key under the bars without a word.";
+      updateStory(state => ({
+        ...state,
+        fullHistory: [...(state.fullHistory || []), {
+          speaker: 'Kaelen',
+          text: npcLine,
+          timestamp: Date.now(),
+          type: 'dialogue'
+        }]
+      }));
+
       if (escaped) {
         updateStory(state => addItem(addLog({
           ...state, flags: { ...state.flags, kaelenMood: 'merciful' },
         }, 'Kaelen slides the key under the bars.'), 'rusted_key'));
         setDialog({
           speaker: 'Kaelen',
-          text: line || "Kaelen slides a key under the bars without a word.",
+          text: npcLine,
           options: [{ label: 'Take the key', action: () => setDialog(null) }],
         });
       } else {
@@ -309,7 +433,7 @@ const App: React.FC = () => {
     } finally {
       setIsAiLoading(false);
     }
-  }, []); // stable — reads fresh story via storyRef
+  }
 
   const openKaelenCell = async () => {
     setIsAiLoading(true);
@@ -317,6 +441,15 @@ const App: React.FC = () => {
 
     try {
       const line = await GeminiService.generateKaelenGreeting('cell', storyRef.current);
+      updateStory(state => ({
+        ...state,
+        fullHistory: [...(state.fullHistory || []), {
+          speaker: 'Kaelen',
+          text: line,
+          timestamp: Date.now(),
+          type: 'dialogue'
+        }]
+      }));
       setDialog({
         speaker: 'Kaelen',
         text: line,
@@ -420,8 +553,7 @@ const App: React.FC = () => {
     });
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleGateKaelenInput = React.useCallback(async (playerLine: string) => {
+  async function handleGateKaelenInput(playerLine: string) {
     setIsAiLoading(true);
     setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
     try {
@@ -459,7 +591,7 @@ const App: React.FC = () => {
     } finally {
       setIsAiLoading(false);
     }
-  }, []); // stable — reads fresh story via storyRef
+  }
 
   const openGateKaelen = async () => {
     setIsAiLoading(true);
@@ -529,28 +661,37 @@ const App: React.FC = () => {
     goToScene('outskirts', 'Elara escapes through smoke and violet fire.');
   };
 
-  const startCombat = () => {
+  function startCombat() {
+    const rules = getDifficultyRules(settings.gameplay.difficulty);
     setDialog(null);
-    setCombat({ kaelen: 6, elara: story.health, message: 'Kaelen raises his shield. Time your strikes and guard when you are hurt.' });
-  };
+    setCombat({
+      kaelen: rules.kaelenHealth,
+      kaelenMax: rules.kaelenHealth,
+      elara: story.health,
+      elaraMax: story.maxHealth,
+      message: 'Kaelen raises his shield. Time your strikes and guard when you are hurt.',
+    });
+  }
 
   const strikeKaelen = () => {
     setCombat((current) => {
       if (!current) return current;
-      const kaelen = Math.max(0, current.kaelen - 2);
-      const elara = kaelen <= 0 ? current.elara : Math.max(0, current.elara - 1);
+      const rules = getDifficultyRules(settings.gameplay.difficulty);
+      const kaelen = Math.max(0, current.kaelen - rules.strikeDamage);
+      const elara = kaelen <= 0 ? current.elara : Math.max(0, current.elara - rules.counterDamage);
       if (kaelen <= 0) {
         winCombat(elara);
         return null;
       }
-      return { kaelen, elara, message: 'Your dagger finds a gap. Kaelen answers with the haft of his spear.' };
+      return { ...current, kaelen, elara, message: 'Your dagger finds a gap. Kaelen answers with the haft of his spear.' };
     });
   };
 
   const guardKaelen = () => {
     setCombat((current) => {
       if (!current) return current;
-      const elara = Math.min(story.maxHealth, current.elara + 1);
+      const rules = getDifficultyRules(settings.gameplay.difficulty);
+      const elara = Math.min(current.elaraMax, current.elara + rules.guardHeal);
       return { ...current, elara, message: 'You brace behind the dagger and catch your breath.' };
     });
   };
@@ -566,7 +707,14 @@ const App: React.FC = () => {
 
   const retryCombat = () => {
     updateStory((state) => ({ ...state, health: state.maxHealth }));
-    setCombat({ kaelen: 6, elara: story.maxHealth, message: 'You steady yourself and try the duel again.' });
+    const rules = getDifficultyRules(settings.gameplay.difficulty);
+    setCombat({
+      kaelen: rules.kaelenHealth,
+      kaelenMax: rules.kaelenHealth,
+      elara: story.maxHealth,
+      elaraMax: story.maxHealth,
+      message: 'You steady yourself and try the duel again.',
+    });
   };
 
   const openFinalEnvoy = () => {
@@ -601,24 +749,63 @@ const App: React.FC = () => {
   const handleStartGame = () => {
     enterFullscreen();
     resetGame();
+    setGameShellProgress(0);
+    setGameShellReady(false);
+    setPhaserProgress(0);
+    setPhaserAssetsReady(false);
+    setLoadingError(null);
     setIsGameStarted(true);
     setIsLoading(true);
   };
 
   const handleLoadGame = () => {
     enterFullscreen();
+    setGameShellProgress(0);
+    setGameShellReady(false);
+    setPhaserProgress(0);
+    setPhaserAssetsReady(false);
+    setLoadingError(null);
     setIsGameStarted(true);
     setIsLoading(true);
   };
 
-  const handleLoadingComplete = () => {
+  const handleLoadingComplete = React.useCallback(() => {
     setIsLoading(false);
     setShowReveal(true);
     setHudKey(k => k + 1);
     setTimeout(() => setShowReveal(false), 1500);
-  };
+  }, []);
 
-  const hasSave = useMemo(() => localStorage.getItem('shadow_toll_story') !== null, [isGameStarted]);
+  useEffect(() => {
+    if (!isGameStarted || !isLoading) return;
+
+    let cancelled = false;
+
+    preloadBrowserAssets(GAME_SHELL_ASSET_URLS, ({ loaded, total }) => {
+      if (!cancelled) setGameShellProgress(total === 0 ? 1 : loaded / total);
+    })
+      .then(() => {
+        if (!cancelled) setGameShellReady(true);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Failed to load game shell assets.';
+        if (!cancelled) setLoadingError(message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isGameStarted, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading || !gameShellReady || !phaserAssetsReady || loadingError) return;
+    const timer = setTimeout(handleLoadingComplete, 0);
+    return () => clearTimeout(timer);
+  }, [gameShellReady, handleLoadingComplete, isLoading, loadingError, phaserAssetsReady]);
+
+  const loadingProgress = Math.round(((gameShellProgress * 0.35) + (phaserProgress * 0.65)) * 100);
+
+  const hasSave = localStorage.getItem('shadow_toll_story') !== null;
 
   if (!isGameStarted) {
     return (
@@ -629,7 +816,7 @@ const App: React.FC = () => {
           alt=""
           style={{ opacity: isPreloaded ? 1 : 0, transition: 'opacity 0.8s ease' }}
           loading="eager"
-          // @ts-ignore - fetchpriority is a new attribute
+          // @ts-expect-error - fetchpriority is not in every React type bundle yet.
           fetchpriority="high"
         />
         <div className="absolute inset-0 bg-black/10" />
@@ -678,7 +865,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <SettingsWindow isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+        <SettingsWindow isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} isGameStarted={isGameStarted} />
       </div>
     );
   }
@@ -688,14 +875,20 @@ const App: React.FC = () => {
       <div style={{ visibility: isLoading ? 'hidden' : 'visible' }}>
         <PhaserGame 
           storyState={story} 
+          settings={settings}
           uiVisible={uiVisible} 
           onGameAction={handleGameAction} 
           onToggleUI={() => setUiVisible(v => !v)}
           onToggleInventory={() => setInventoryOpen(v => !v)}
+          onStaminaUpdate={(p) => setStaminaPercent(p)}
+          onInteractionPrompt={(p) => setInteractionPrompt(p)}
+          onAssetProgress={setPhaserProgress}
+          onAssetsReady={() => setPhaserAssetsReady(true)}
+          onAssetError={(asset) => setLoadingError(`Failed to load ${asset}`)}
         />
       </div>
 
-      {isLoading && <LoadingScreen onComplete={handleLoadingComplete} />}
+      {isLoading && <LoadingScreen progress={loadingProgress} error={loadingError} />}
 
       {showReveal && <div className="game-reveal-overlay" />}
 
@@ -715,7 +908,7 @@ const App: React.FC = () => {
               <div className="ui-hp-fill" style={{ width: `${(story.health / story.maxHealth) * 100}%` }} />
             </div>
             <div className="ui-hp-bar ui-hp-bar--stamina">
-              <div className="ui-hp-fill ui-hp-fill--secondary" style={{ width: '100%' }} />
+              <div className="ui-hp-fill ui-hp-fill--secondary" style={{ width: `${staminaPercent * 100}%` }} />
             </div>
           </div>
 
@@ -759,6 +952,37 @@ const App: React.FC = () => {
             </button>
           </div>
 
+          <button
+            className="ui-settings-hitbox"
+            onClick={() => setIsSettingsOpen(true)}
+            title="Settings"
+          />
+
+          <button
+            className="ui-inventory-hitbox"
+            onClick={() => setInventoryOpen(true)}
+            title="Inventory"
+          />
+
+          <button
+            className="ui-story-log-hitbox"
+            onClick={() => setIsStoryLogOpen(true)}
+            title="Story Log"
+          />
+
+          <button
+            className="ui-reset-hitbox"
+            onClick={() => setIsResetConfirmOpen(true)}
+            title="Reset Game"
+          />
+
+          {/* Interaction prompt */}
+          {interactionPrompt && settings.gameplay.tutorialTooltips && !dialog && !inventoryOpen && !combat && !isStoryLogOpen && !isResetConfirmOpen && (
+            <div className="ui-interaction-prompt">
+              {interactionPrompt}
+            </div>
+          )}
+
           {/* Bottom: 10-slot hotbar */}
           <div className="ui-hotbar">
             {Array.from({ length: 10 }).map((_, i) => {
@@ -788,11 +1012,57 @@ const App: React.FC = () => {
           onRetry={retryCombat}
         />
       )}
+      <SettingsWindow isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} isGameStarted={isGameStarted} />
+      <StoryLogWindow isOpen={isStoryLogOpen} onClose={() => setIsStoryLogOpen(false)} history={story.fullHistory} />
+      {isResetConfirmOpen && (
+        <SystemConfirmModal 
+          title="RESET DESTINY"
+          message="Are you certain you wish to unravel the threads of this journey? All progress will be lost to the mists of time."
+          onConfirm={() => { resetGame(); setIsResetConfirmOpen(false); }}
+          onCancel={() => setIsResetConfirmOpen(false)}
+          confirmLabel="RESET"
+          cancelLabel="CANCEL"
+        />
+      )}
 
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_150px_rgba(0,0,0,0.8)]" />
     </div>
   );
 };
+
+const SystemConfirmModal: React.FC<{
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  confirmLabel: string;
+  cancelLabel: string;
+}> = ({ title, message, onConfirm, onCancel, confirmLabel, cancelLabel }) => (
+  <div className="dialog-shell" style={{ alignItems: 'center', zIndex: 120 }}>
+    <div className="dialog-panel" style={{ width: '400px', textAlign: 'center' }}>
+      <div style={{ 
+        fontFamily: "'Press Start 2P', monospace", 
+        fontSize: '14px', 
+        color: '#f0e0a0', 
+        marginBottom: '20px',
+        textShadow: '2px 2px 0 #000'
+      }}>
+        {title}
+      </div>
+      <p style={{ marginBottom: '30px' }}>{message}</p>
+      <div className="dialog-options" style={{ justifyContent: 'center', gap: '20px' }}>
+        <button onClick={onConfirm} style={{ color: '#ffb4a0' }}>
+          <RotateCcw size={16} />
+          {confirmLabel}
+        </button>
+        <button onClick={onCancel}>
+          <X size={16} />
+          {cancelLabel}
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 const DialogOverlay: React.FC<{ dialog: DialogState; isLoading?: boolean; onClose: () => void }> = ({ dialog, isLoading, onClose }) => {
   const [inputText, setInputText] = React.useState('');
@@ -882,8 +1152,8 @@ const CombatOverlay: React.FC<{
   onRetry: () => void;
 }> = ({ combat, onStrike, onGuard, onRetry }) => {
   const defeated = combat.elara <= 0;
-  const elaraHP = (combat.elara / 6) * 100;
-  const kaelenHP = (combat.kaelen / 6) * 100;
+  const elaraHP = (combat.elara / combat.elaraMax) * 100;
+  const kaelenHP = (combat.kaelen / combat.kaelenMax) * 100;
 
   return (
     <div className="combat-overlay">
@@ -896,7 +1166,7 @@ const CombatOverlay: React.FC<{
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-end">
               <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px', color: '#ffe0a0' }}>ELARA</span>
-              <span style={{ fontSize: '14px', color: '#d4a373' }}>{Math.max(0, combat.elara)} / 6</span>
+              <span style={{ fontSize: '14px', color: '#d4a373' }}>{Math.max(0, combat.elara)} / {combat.elaraMax}</span>
             </div>
             <div style={{
               width: '100%', height: '12px',
@@ -916,7 +1186,7 @@ const CombatOverlay: React.FC<{
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-end">
               <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px', color: '#ffe0a0' }}>KAELEN</span>
-              <span style={{ fontSize: '14px', color: '#d4a373' }}>{combat.kaelen} / 6</span>
+              <span style={{ fontSize: '14px', color: '#d4a373' }}>{combat.kaelen} / {combat.kaelenMax}</span>
             </div>
             <div style={{
               width: '100%', height: '12px',
@@ -962,39 +1232,8 @@ const loadStory = (): StoryState => {
 
 export default App;
 
-const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
-  const [progress, setProgress] = useState(0);
-  const onCompleteRef = React.useRef(onComplete);
-  onCompleteRef.current = onComplete;
-
-  useEffect(() => {
-    let currentProgress = 0;
-    let timer: ReturnType<typeof setTimeout>;
-
-    const updateProgress = () => {
-      const remaining = 100 - currentProgress;
-      const increment = Math.random() * (remaining * 0.3) + 1.0;
-      currentProgress = Math.min(currentProgress + increment, 99.9);
-      setProgress(currentProgress);
-
-      if (currentProgress < 99.9) {
-        const delay = Math.random() * 300 + 50;
-        timer = setTimeout(updateProgress, delay);
-      } else {
-        setTimeout(() => {
-          setProgress(100);
-          setTimeout(() => onCompleteRef.current(), 400);
-        }, 400);
-      }
-    };
-
-    const initialDelay = setTimeout(updateProgress, 200);
-    return () => {
-      clearTimeout(initialDelay);
-      clearTimeout(timer);
-    };
-  }, []);
-
+const LoadingScreen: React.FC<{ progress: number; error: string | null }> = ({ progress, error }) => {
+  const safeProgress = Math.max(0, Math.min(100, progress));
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-end pb-[15vh] font-pixel overflow-hidden z-[200]">
       <img 
@@ -1002,7 +1241,7 @@ const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
         className="absolute inset-0 w-full h-full object-cover -z-10" 
         alt=""
         loading="eager"
-        // @ts-ignore - fetchpriority is a new attribute
+        // @ts-expect-error - fetchpriority is not in every React type bundle yet.
         fetchpriority="high"
       />
       <div className="w-full max-w-lg flex flex-col items-center gap-4 relative z-10 px-8">
@@ -1016,7 +1255,7 @@ const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
           }}
           className="animate-pulse mb-6 uppercase"
         >
-          LOADING...
+          {error ? 'LOAD FAILED' : 'LOADING...'}
         </div>
 
         <div className="w-full relative">
@@ -1032,7 +1271,7 @@ const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
           }}>
             {/* Rounded Progress Fill */}
             <div style={{
-              width: `${progress}%`, height: '100%',
+              width: `${safeProgress}%`, height: '100%',
               background: 'linear-gradient(180deg, #8a6838 0%, #c09050 50%, #8a6838 100%)',
               transition: 'width 0.4s ease-out',
               borderRadius: '10px'
@@ -1045,7 +1284,7 @@ const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
                draggable={false}
                style={{
                   position: 'absolute',
-                  left: `calc(${progress}% - 12px)`,
+                  left: `calc(${safeProgress}% - 12px)`,
                   top: '-10px',
                   width: '24px',
                   height: `${24 * (367/287)}px`,
@@ -1064,8 +1303,20 @@ const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
             fontSize: '10px', color: '#f0e0a0',
             textShadow: '1px 1px 0 #000'
           }}>
-            {Math.floor(progress)}%
+            {Math.floor(safeProgress)}%
           </div>
+          {error && (
+            <div style={{
+              marginTop: '44px',
+              fontFamily: "'VT323', monospace",
+              fontSize: '20px',
+              color: '#ffb4a0',
+              textShadow: '2px 2px 0 #000',
+              textAlign: 'center',
+            }}>
+              {error}
+            </div>
+          )}
         </div>
       </div>
     </div>

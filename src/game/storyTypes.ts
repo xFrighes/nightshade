@@ -19,15 +19,25 @@ export type StoryFlags = {
   gateOutcome: 'none' | 'persuaded' | 'fought' | 'rune' | 'secret';
 };
 
+export type HistoryEntry = {
+  speaker: string;
+  text: string;
+  timestamp: number;
+  type: 'dialogue' | 'action' | 'system';
+};
+
 export type StoryState = {
   scene: StorySceneId;
   inventory: StoryItemId[];
   gold: number;
   health: number;
   maxHealth: number;
+  stamina: number;
+  maxStamina: number;
   flags: StoryFlags;
   log: string[];
   dialogueHistory: string[];
+  fullHistory: HistoryEntry[];
   legacySummary?: string;
 };
 
@@ -75,6 +85,8 @@ export const INITIAL_STORY_STATE: StoryState = {
   gold: 0,
   health: 6,
   maxHealth: 6,
+  stamina: 10,
+  maxStamina: 10,
   flags: {
     ratPaid: false,
     coinFound: false,
@@ -88,4 +100,5 @@ export const INITIAL_STORY_STATE: StoryState = {
     // 'Elara wakes in the Iron Cell. No bread, no key — only the guard and the rat.',
   ],
   dialogueHistory: [],
+  fullHistory: [],
 };

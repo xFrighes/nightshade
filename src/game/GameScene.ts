@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import type { GameAction, StorySceneId, StoryState } from './storyTypes';
+import { DEFAULT_KEY_BINDINGS, type SettingsState } from '../store/gameStore';
 
 type Interactable = {
   id: string;
@@ -10,6 +11,7 @@ type Interactable = {
 };
 
 type VirtualInputKey = 'left' | 'right' | 'jump';
+type ControlAction = 'moveUp' | 'moveDown' | 'moveLeft' | 'moveRight' | 'interact' | 'inventory';
 
 const CELL_BARS_RIGHT_EDGE = 720;
 const CELL_SPAWN_X = 200;
@@ -41,13 +43,11 @@ const SCENE_BACKGROUNDS: Record<StorySceneId, string> = {
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: Record<string, Phaser.Input.Keyboard.Key>;
-  private interactKey!: Phaser.Input.Keyboard.Key;
+  private spaceKey!: Phaser.Input.Keyboard.Key;
   private hideUIKey!: Phaser.Input.Keyboard.Key;
-  private inventoryKey!: Phaser.Input.Keyboard.Key;
+  private actionKeys!: Record<ControlAction, Phaser.Input.Keyboard.Key>;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private interactables: Interactable[] = [];
-  private prompt!: Phaser.GameObjects.Text;
   private currentState?: StoryState;
   private currentScene?: StorySceneId;
   private near?: Interactable;
@@ -58,12 +58,27 @@ export class GameScene extends Phaser.Scene {
   private sceneTitleText?: Phaser.GameObjects.Text;
   private uiVisible = true;
   private bgImage?: Phaser.GameObjects.Image;
+  private stamina = 10;
+  private maxStamina = 10;
+  private staminaRegenTimer = 0;
+  private settings?: SettingsState;
 
   constructor() { super('GameScene'); }
 
   private v(n: number) { return n * this.viewScale; }
 
   preload() {
+    this.load.on('progress', (value: number) => {
+      this.game.events.emit('asset_load_progress', value);
+    });
+    this.load.on('loaderror', (file: { src?: string; url?: string; key?: string }) => {
+      this.game.events.emit('asset_load_error', file.src ?? file.url ?? file.key ?? 'unknown asset');
+    });
+    this.load.once('complete', () => {
+      this.game.events.emit('asset_load_progress', 1);
+      this.game.events.emit('asset_load_complete');
+    });
+
     this.load.image('bg_cell', '/bg_cell.png');
     this.load.image('bg_cell_open', '/bg_cell_open.png');
     this.load.image('bg_market', '/bg_market.png');
@@ -84,7 +99,7 @@ export class GameScene extends Phaser.Scene {
   private getPlayerScale() { return (this.v(262) / 500) * 1.6; }
 
   create() {
-    const { width, height } = this.scale;
+    const { height } = this.scale;
     const worldHeight = this.getWorldHeight();
 
     this.physics.world.setBounds(0, 0, 2200, worldHeight);
@@ -133,27 +148,22 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.platforms);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as Record<string, Phaser.Input.Keyboard.Key>;
-    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.hideUIKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.H);
-    this.inventoryKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I);
-
-    this.prompt = this.add.text(width / 2, height - 92, '', {
-      fontFamily: 'VT323, monospace',
-      fontSize: '30px',
-      color: '#f5d78e',
-      backgroundColor: 'rgba(5,4,8,0.72)',
-      padding: { x: 14, y: 8 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(5000);
+    this.settings = this.game.registry.get('settings') as SettingsState | undefined;
+    this.rebuildActionKeys();
 
     this.game.events.on('story_update', (state: StoryState) => this.applyStoryState(state));
     this.game.events.on('ui_visibility', (visible: boolean) => {
       this.uiVisible = visible;
-      this.prompt.setAlpha(visible ? 1 : 0);
       this.sceneTitleText?.setAlpha(visible ? 1 : 0);
     });
     this.game.events.on('virtual_input', (input: { key: VirtualInputKey; active: boolean }) => {
       this.virtualInput[input.key] = input.active;
+    });
+    this.game.events.on('settings_update', (settings: SettingsState) => {
+      this.settings = settings;
+      this.rebuildActionKeys();
     });
     this.game.events.on('virtual_interact', () => {
       if (this.near) this.emitAction(this.near.id.startsWith('collect_')
@@ -164,8 +174,18 @@ export class GameScene extends Phaser.Scene {
     this.applyStoryState((this.game.registry.get('story_state') as StoryState | undefined) ?? undefined);
   }
 
-  update() {
+  update(_time: number, delta: number) {
     if (!this.player?.body) return;
+
+    // Stamina regeneration
+    if (this.stamina < this.maxStamina) {
+      this.staminaRegenTimer += delta;
+      if (this.staminaRegenTimer >= 150) { // regenerate every 150ms
+        this.stamina = Math.min(this.maxStamina, this.stamina + 0.5);
+        this.staminaRegenTimer = 0;
+        this.game.events.emit('stamina_update', this.stamina / this.maxStamina);
+      }
+    }
 
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -174,18 +194,24 @@ export class GameScene extends Phaser.Scene {
     this.syncPlayerBodyToFrame();
     const speed = this.v(this.currentState?.flags.runeTaken ? 285 : 245);
     const jump = this.v(this.currentState?.flags.runeTaken ? 610 : 470);
-    const left = this.cursors.left.isDown || this.wasd.A.isDown || this.virtualInput.left;
-    const right = this.cursors.right.isDown || this.wasd.D.isDown || this.virtualInput.right;
-    const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up)
-      || Phaser.Input.Keyboard.JustDown(this.wasd.W)
+    const verticalKey = this.settings?.controls.invertY ? this.actionKeys.moveDown : this.actionKeys.moveUp;
+    const verticalCursor = this.settings?.controls.invertY ? this.cursors.down : this.cursors.up;
+    const left = this.cursors.left.isDown || this.actionKeys.moveLeft.isDown || this.virtualInput.left;
+    const right = this.cursors.right.isDown || this.actionKeys.moveRight.isDown || this.virtualInput.right;
+    const jumpPressed = Phaser.Input.Keyboard.JustDown(verticalCursor)
+      || Phaser.Input.Keyboard.JustDown(verticalKey)
+      || Phaser.Input.Keyboard.JustDown(this.spaceKey)
       || this.virtualInput.jump;
 
     body.setVelocityX(0);
     if (left) { body.setVelocityX(-speed); this.player.setFlipX(true); }
     if (right) { body.setVelocityX(speed); this.player.setFlipX(false); }
-    if (jumpPressed && body.blocked.down) {
+    if (jumpPressed && body.blocked.down && this.stamina >= 2) {
       body.setVelocityY(-jump);
       this.virtualInput.jump = false;
+      this.stamina -= 2;
+      this.game.events.emit('stamina_update', this.stamina / this.maxStamina);
+      this.shakeCamera(90, 0.0025);
     }
 
     if (this.currentState?.scene === 'cell') {
@@ -203,7 +229,7 @@ export class GameScene extends Phaser.Scene {
     this.player.setDepth(this.player.y);
     this.updateNearestInteractable();
 
-    if (Phaser.Input.Keyboard.JustDown(this.interactKey) && this.near && this.time.now - this.lastInteractAt > 300) {
+    if (Phaser.Input.Keyboard.JustDown(this.actionKeys.interact) && this.near && this.time.now - this.lastInteractAt > 300) {
       this.lastInteractAt = this.time.now;
       this.emitAction(this.near.id.startsWith('collect_')
         ? { type: 'collect', target: this.near.id }
@@ -214,7 +240,7 @@ export class GameScene extends Phaser.Scene {
       this.game.events.emit('toggle_ui');
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.inventoryKey)) {
+    if (Phaser.Input.Keyboard.JustDown(this.actionKeys.inventory)) {
       this.game.events.emit('toggle_inventory');
     }
 
@@ -282,15 +308,6 @@ export class GameScene extends Phaser.Scene {
     this.player.setPosition(this.v(this.sceneStartX(state.scene)), baseY);
     (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
     this.syncPlayerBodyToFrame();
-
-    this.prompt = this.add.text(width / 2, height - this.v(92), '', {
-      fontFamily: 'VT323, monospace',
-      fontSize: `${Math.round(this.v(30))}px`,
-      color: '#f5d78e',
-      backgroundColor: 'rgba(5,4,8,0.72)',
-      padding: { x: this.v(14), y: this.v(8) },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(5000);
-    this.prompt.setAlpha(this.uiVisible ? 1 : 0);
 
     this.sceneTitleText = this.add.text(this.v(26), this.v(24), SCENE_TITLES[state.scene], {
       fontFamily: 'VT323, monospace',
@@ -569,16 +586,56 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.near = nearest;
-    if (nearest) {
-      this.prompt.setText(`[E]  ${nearest.hint}`);
+    const showTutorial = this.settings?.gameplay.tutorialTooltips ?? true;
+    if (nearest && showTutorial) {
+      this.game.events.emit('interaction_prompt', `[${this.formatBinding('interact')}]  ${nearest.hint}`);
       nearest.label.setVisible(true);
     } else {
-      this.prompt.setText('');
+      this.game.events.emit('interaction_prompt', '');
     }
   }
 
   private emitAction(action: GameAction) {
+    this.shakeCamera(120, 0.0035);
     this.game.events.emit('game_action', action);
+  }
+
+  private rebuildActionKeys() {
+    const bindings = {
+      ...DEFAULT_KEY_BINDINGS,
+      ...this.settings?.controls.keyBindings,
+    } as Record<ControlAction, string>;
+
+    this.actionKeys = {
+      moveUp: this.input.keyboard!.addKey(this.toKeyCode(bindings.moveUp)),
+      moveDown: this.input.keyboard!.addKey(this.toKeyCode(bindings.moveDown)),
+      moveLeft: this.input.keyboard!.addKey(this.toKeyCode(bindings.moveLeft)),
+      moveRight: this.input.keyboard!.addKey(this.toKeyCode(bindings.moveRight)),
+      interact: this.input.keyboard!.addKey(this.toKeyCode(bindings.interact)),
+      inventory: this.input.keyboard!.addKey(this.toKeyCode(bindings.inventory)),
+    };
+  }
+
+  private toKeyCode(key: string) {
+    const normalized = key.toUpperCase().replace(/\s+/g, '');
+    if (normalized === ' ') return Phaser.Input.Keyboard.KeyCodes.SPACE;
+    if (normalized === 'ARROWUP') return Phaser.Input.Keyboard.KeyCodes.UP;
+    if (normalized === 'ARROWDOWN') return Phaser.Input.Keyboard.KeyCodes.DOWN;
+    if (normalized === 'ARROWLEFT') return Phaser.Input.Keyboard.KeyCodes.LEFT;
+    if (normalized === 'ARROWRIGHT') return Phaser.Input.Keyboard.KeyCodes.RIGHT;
+
+    const keyCodes = Phaser.Input.Keyboard.KeyCodes as Record<string, number>;
+    return keyCodes[normalized] ?? keyCodes[DEFAULT_KEY_BINDINGS.interact];
+  }
+
+  private formatBinding(action: ControlAction) {
+    const key = this.settings?.controls.keyBindings[action] ?? DEFAULT_KEY_BINDINGS[action];
+    return key.length === 1 ? key.toUpperCase() : key;
+  }
+
+  private shakeCamera(duration: number, intensity: number) {
+    if (!(this.settings?.gameplay.cameraShake ?? true)) return;
+    this.cameras.main.shake(duration, intensity);
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
