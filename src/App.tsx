@@ -77,6 +77,33 @@ const formatKaelenGeminiError = (err: unknown): string => {
   return `Gemini could not answer as Kaelen. ${message}`;
 };
 
+const kaelenCellGreeting = 'Kaelen keeps one hand on the ring of keys. "Do not make me choose between orders and mercy tonight."';
+
+const kaelenGateGreeting = 'Kaelen blocks the bridge with his spear lowered but not leveled. "One more step and I have to become the kind of man this city pays me to be."';
+
+const includesAny = (text: string, terms: string[]) => terms.some(term => text.includes(term));
+
+const scoresKaelenAppeal = (line: string, scene: 'cell' | 'gate'): boolean => {
+  const text = line.toLowerCase();
+  const threatening = includesAny(text, ['kill', 'cut you', 'stab', 'die', 'move or', 'threat', 'burn you']);
+  if (threatening) return false;
+
+  const honorAppeal = includesAny(text, ['oath', 'honor', 'honour', 'duty', 'conscience', 'mercy', 'merciful']);
+  const peopleAppeal = includesAny(text, ['people', 'famil', 'child', 'children', 'innocent', 'city', 'protect']);
+  const orderAppeal = includesAny(text, ['order', 'orders', 'watch', 'captain', 'not your enemy']);
+  const peacefulPromise = includesAny(text, ['no blood', 'without blood', 'no names', 'never saw me', 'let me pass', 'step aside']);
+  const corruptionAppeal = includesAny(text, ['silas', 'pass', 'coin', 'debt', 'selling']);
+  const darknessAppeal = includesAny(text, ['rune', 'curse', 'darkness', 'burn']);
+
+  if (scene === 'cell') {
+    return honorAppeal && (peopleAppeal || orderAppeal);
+  }
+
+  const score = [honorAppeal, peopleAppeal, peacefulPromise, corruptionAppeal, darknessAppeal]
+    .filter(Boolean).length;
+  return score >= 2;
+};
+
 const App: React.FC = () => {
   const [isGameStarted, setIsGameStarted] = useState(() => new URLSearchParams(window.location.search).has('autostart'));
   const [isLoading, setIsLoading] = useState(false);
@@ -392,10 +419,106 @@ const App: React.FC = () => {
     });
   };
 
+  function grantCellKey(choice: string, kaelenLine: string) {
+    updateStory(state => {
+      const next = recordChoice({
+        ...state,
+        flags: { ...state.flags, kaelenMood: 'honorable' },
+      }, choice);
+      return addItem(addLog({
+        ...next,
+        fullHistory: [...(next.fullHistory || []), {
+          speaker: 'Kaelen',
+          text: kaelenLine,
+          timestamp: Date.now(),
+          type: 'dialogue',
+        }],
+      }, 'Kaelen chooses mercy and passes over the Rusted Key.'), 'rusted_key');
+    });
+    setDialog({
+      speaker: 'Kaelen',
+      text: kaelenLine,
+      options: [{ label: 'Take the key', action: () => setDialog(null) }],
+    });
+  }
+
+  function openCellPersuasion(step = 0) {
+    if (step === 0) {
+      setDialog({
+        speaker: 'Kaelen',
+        text: 'Kaelen looks tired enough to mistake honesty for sleep. "Speak carefully. Pity will not open iron."',
+        options: [
+          { label: 'Ask who his orders really protect', action: () => openCellPersuasion(1) },
+          { label: 'Tell him the Watch still needs honorable men', action: () => openCellPersuasion(1) },
+          { label: 'Threaten him through the bars', action: () => openCellPersuasion(2) },
+          { label: 'Back away', action: () => setDialog(null) },
+        ],
+      });
+      return;
+    }
+
+    if (step === 1) {
+      setDialog({
+        speaker: 'Kaelen',
+        text: '"My oath was to keep families safe," he says. "Tonight it keeps one woman in a cage."',
+        options: [
+          {
+            label: 'Then honor the oath, not the cage',
+            action: () => grantCellKey(
+              'Asked Kaelen to honor his oath, not the cage',
+              'Kaelen closes his eyes, then slides the key through the bars. "No blood. No boasting. Go before I remember my orders."',
+            ),
+          },
+          {
+            label: 'Promise no blood and no names',
+            action: () => grantCellKey(
+              'Promised Kaelen no blood and no names',
+              'The key scrapes across stone. "If anyone asks, the lock failed before my courage did."',
+            ),
+          },
+          { label: 'Call him a coward for hesitating', action: () => openCellPersuasion(2) },
+        ],
+      });
+      return;
+    }
+
+    setDialog({
+      speaker: 'Kaelen',
+      text: 'Kaelen steps back from the bars. "Threats are easy. Mercy is what costs."',
+      options: [
+        { label: 'Try a better appeal', action: () => openCellPersuasion(0) },
+        { label: 'Back away', action: () => setDialog(null) },
+      ],
+    });
+  }
+
   async function handleCellKaelenInput(playerLine: string) {
     setIsAiLoading(true);
     setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
     try {
+      if (scoresKaelenAppeal(playerLine, 'cell')) {
+        grantCellKey(
+          playerLine,
+          'Kaelen studies you for a long breath, then slides the key through the bars. "That is the first honest thing this prison has heard all week."',
+        );
+        return;
+      }
+
+      if (!GeminiService.isConfigured()) {
+        updateStory(state => recordChoice(state, playerLine));
+        setDialog({
+          speaker: 'Kaelen',
+          text: 'Kaelen does not move for that. "Find the part of me that still remembers the oath, not the part that fears the keys."',
+          options: [
+            { label: 'Try a better appeal', action: () => openCellPersuasion(0) },
+            { label: 'Back away', action: () => setDialog(null) },
+          ],
+          inputMode: true,
+          onInput: handleCellKaelenInput,
+        });
+        return;
+      }
+
       const { line, escaped } = await GeminiService.generateKaelenResponse(
         playerLine, storyRef.current.dialogueHistory,
       );
@@ -431,13 +554,15 @@ const App: React.FC = () => {
         });
       }
     } catch (err: unknown) {
-      const canRetry = GeminiService.isConfigured();
       setDialog({
         speaker: 'Kaelen',
-        text: formatKaelenGeminiError(err),
-        options: [{ label: 'Step back', action: () => setDialog(null) }],
-        inputMode: canRetry,
-        onInput: canRetry ? handleCellKaelenInput : undefined,
+        text: `${kaelenCellGreeting} (${formatKaelenGeminiError(err)})`,
+        options: [
+          { label: 'Try a direct appeal', action: () => openCellPersuasion(0) },
+          { label: 'Step back', action: () => setDialog(null) },
+        ],
+        inputMode: true,
+        onInput: handleCellKaelenInput,
       });
     } finally {
       setIsAiLoading(false);
@@ -445,6 +570,20 @@ const App: React.FC = () => {
   }
 
   const openKaelenCell = async () => {
+    if (!GeminiService.isConfigured()) {
+      setDialog({
+        speaker: 'Kaelen',
+        text: kaelenCellGreeting,
+        options: [
+          { label: 'Talk him into opening the cell', action: () => openCellPersuasion(0) },
+          { label: 'Back away', action: () => setDialog(null) },
+        ],
+        inputMode: true,
+        onInput: handleCellKaelenInput,
+      });
+      return;
+    }
+
     setIsAiLoading(true);
     setDialog({ speaker: 'Kaelen', text: '...', options: [] });
 
@@ -462,18 +601,23 @@ const App: React.FC = () => {
       setDialog({
         speaker: 'Kaelen',
         text: line,
-        options: [{ label: 'Back away', action: () => setDialog(null) }],
+        options: [
+          { label: 'Talk him into opening the cell', action: () => openCellPersuasion(0) },
+          { label: 'Back away', action: () => setDialog(null) },
+        ],
         inputMode: true,
         onInput: handleCellKaelenInput,
       });
     } catch (err: unknown) {
-      const canRetry = GeminiService.isConfigured();
       setDialog({
         speaker: 'Kaelen',
-        text: formatKaelenGeminiError(err),
-        options: [{ label: 'Back away', action: () => setDialog(null) }],
-        inputMode: canRetry,
-        onInput: canRetry ? handleCellKaelenInput : undefined,
+        text: `${kaelenCellGreeting} (${formatKaelenGeminiError(err)})`,
+        options: [
+          { label: 'Talk him into opening the cell', action: () => openCellPersuasion(0) },
+          { label: 'Back away', action: () => setDialog(null) },
+        ],
+        inputMode: true,
+        onInput: handleCellKaelenInput,
       });
     } finally {
       setIsAiLoading(false);
@@ -562,18 +706,118 @@ const App: React.FC = () => {
     });
   };
 
+  function persuadeGateOpen(choice: string, kaelenLine: string) {
+    updateStory(state => {
+      const next = recordChoice({
+        ...state,
+        flags: { ...state.flags, kaelenMood: 'merciful', gateOutcome: 'persuaded' },
+      }, choice);
+      return addLog({
+        ...next,
+        fullHistory: [...(next.fullHistory || []), {
+          speaker: 'Kaelen',
+          text: kaelenLine,
+          timestamp: Date.now(),
+          type: 'dialogue',
+        }],
+      }, 'Kaelen lowers his spear and lets Elara pass.');
+    });
+    setDialog({
+      speaker: 'Kaelen',
+      text: kaelenLine,
+      options: [{ label: 'Walk through the gate', action: () => goToScene('outskirts', 'Kaelen turns his back on the order and opens the way.') }],
+    });
+  }
+
+  function openGatePersuasion(step = 0) {
+    if (step === 0) {
+      setDialog({
+        speaker: 'Kaelen',
+        text: 'Kaelen does not raise the alarm. That is the crack. "Give me a reason that is not fear."',
+        options: [
+          { label: 'Your oath is to protect people, not orders', action: () => openGatePersuasion(1) },
+          { label: 'Silas sells passes while you bleed for rules', action: () => openGatePersuasion(1) },
+          {
+            label: 'Remind him he already chose mercy',
+            disabled: storyRef.current.flags.kaelenMood !== 'honorable' && storyRef.current.flags.kaelenMood !== 'merciful',
+            action: () => openGatePersuasion(1),
+          },
+          { label: 'Threaten to cut through him', action: () => openGatePersuasion(2) },
+        ],
+      });
+      return;
+    }
+
+    if (step === 1) {
+      setDialog({
+        speaker: 'Kaelen',
+        text: '"If I open this gate, I betray the Watch." His grip loosens anyway. "If I do not, I betray myself."',
+        options: [
+          {
+            label: 'No blood. No names. You never saw me',
+            action: () => persuadeGateOpen(
+              'Promised Kaelen no blood, no names, and no report',
+              'Kaelen steps aside and looks toward the city instead of you. "Then be gone before I find a braver lie."',
+            ),
+          },
+          {
+            label: 'Let mercy be the order you obey tonight',
+            action: () => persuadeGateOpen(
+              'Asked Kaelen to obey mercy over orders',
+              'The spear dips. "Mercy, then. One order the city has not managed to outlaw."',
+            ),
+          },
+          { label: 'Tell him fear will remember his face', action: () => openGatePersuasion(2) },
+        ],
+      });
+      return;
+    }
+
+    setDialog({
+      speaker: 'Kaelen',
+      text: 'Kaelen raises the spear again. "That is not persuasion. That is just another cage."',
+      options: [
+        { label: 'Try to reach his conscience', action: () => openGatePersuasion(0) },
+        { label: 'Draw steel', action: startCombat },
+      ],
+    });
+  }
+
   async function handleGateKaelenInput(playerLine: string) {
     setIsAiLoading(true);
     setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
     try {
+      if (scoresKaelenAppeal(playerLine, 'gate')) {
+        persuadeGateOpen(
+          playerLine,
+          'Kaelen hears the shape of the choice before he answers. The spear lowers. "No blood. No names. Run."',
+        );
+        return;
+      }
+
+      if (!GeminiService.isConfigured()) {
+        updateStory(state => recordChoice(state, playerLine));
+        setDialog({
+          speaker: 'Kaelen',
+          text: 'Kaelen keeps the spear across the road. "Fear, threats, cleverness. None of that gets you through. Give me conscience, or give me steel."',
+          options: [
+            { label: 'Try to reach his conscience', action: () => openGatePersuasion(0) },
+            { label: 'Draw steel', action: startCombat },
+          ],
+          inputMode: true,
+          onInput: handleGateKaelenInput,
+        });
+        return;
+      }
+
       const { line, escaped } = await GeminiService.generateKaelenResponse(
         playerLine, storyRef.current.dialogueHistory,
       );
       updateStory(state => recordChoice(state, playerLine));
       if (escaped) {
-        updateStory(state => addLog(recordChoice({
+        updateStory(state => addLog({
           ...state, flags: { ...state.flags, kaelenMood: 'merciful', gateOutcome: 'persuaded' },
-        }, playerLine), 'Kaelen lowers his spear and lets Elara pass.'));
+        }, 'Kaelen lowers his spear and lets Elara pass.'));
         setDialog({
           speaker: 'Kaelen',
           text: line || "Kaelen steps aside. His eyes say he won't report this.",
@@ -583,19 +827,24 @@ const App: React.FC = () => {
         setDialog({
           speaker: 'Kaelen',
           text: line,
-          options: [{ label: 'Draw steel', action: startCombat }],
+          options: [
+            { label: 'Try to reach his conscience', action: () => openGatePersuasion(0) },
+            { label: 'Draw steel', action: startCombat },
+          ],
           inputMode: true,
           onInput: handleGateKaelenInput,
         });
       }
     } catch (err: unknown) {
-      const canRetry = GeminiService.isConfigured();
       setDialog({
         speaker: 'Kaelen',
         text: formatKaelenGeminiError(err),
-        options: [{ label: 'Fight', action: startCombat }],
-        inputMode: canRetry,
-        onInput: canRetry ? handleGateKaelenInput : undefined,
+        options: [
+          { label: 'Try to reach his conscience', action: () => openGatePersuasion(0) },
+          { label: 'Fight', action: startCombat },
+        ],
+        inputMode: true,
+        onInput: handleGateKaelenInput,
       });
     } finally {
       setIsAiLoading(false);
@@ -603,6 +852,24 @@ const App: React.FC = () => {
   }
 
   const openGateKaelen = async () => {
+    const baseOptions: DialogOption[] = [
+      { label: 'Talk him down', action: () => openGatePersuasion(0) },
+      { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
+      { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
+      { label: 'Draw steel', action: startCombat },
+    ];
+
+    if (!GeminiService.isConfigured()) {
+      setDialog({
+        speaker: 'Kaelen',
+        text: kaelenGateGreeting,
+        options: baseOptions,
+        inputMode: true,
+        onInput: handleGateKaelenInput,
+      });
+      return;
+    }
+
     setIsAiLoading(true);
     setDialog({ speaker: 'Kaelen', text: '...', options: [] });
 
@@ -611,26 +878,17 @@ const App: React.FC = () => {
       setDialog({
         speaker: 'Kaelen',
         text: line,
-        options: [
-          { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
-          { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
-          { label: 'Draw steel', action: startCombat },
-        ],
+        options: baseOptions,
         inputMode: true,
         onInput: handleGateKaelenInput,
       });
     } catch (err: unknown) {
-      const canRetry = GeminiService.isConfigured();
       setDialog({
         speaker: 'Kaelen',
-        text: formatKaelenGeminiError(err),
-        options: [
-          { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
-          { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
-          { label: 'Draw steel', action: startCombat },
-        ],
-        inputMode: canRetry,
-        onInput: canRetry ? handleGateKaelenInput : undefined,
+        text: `${kaelenGateGreeting} (${formatKaelenGeminiError(err)})`,
+        options: baseOptions,
+        inputMode: true,
+        onInput: handleGateKaelenInput,
       });
     } finally {
       setIsAiLoading(false);
