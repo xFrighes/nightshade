@@ -11,7 +11,7 @@ interface StoryLogWindowProps {
 const SCALE = 1.1;
 const FRAME_W = 1561 * 0.5 * SCALE;
 const FRAME_H = 1138 * 0.5 * SCALE;
-const CROP_TOP = (3 * 16) + 7; // 3rem + 7px crop
+const CROP_TOP = (3 * 16) + 9; // 3rem + 9px crop
 const CONTENT_SIDE = 42 * SCALE;
 const CONTENT_TOP = 76 * SCALE;
 const CONTENT_BOTTOM = 56 * SCALE;
@@ -75,10 +75,14 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
 
   const contentTop = holeTop - CROP_TOP + (4 * SCALE) + (2 * 16); // 2rem down
   const contentHeight = holeHeight - (8 * SCALE) + (1.5 * 16); // 1.5rem bigger height
+  
+  const headerTop = (34 * SCALE) - (CROP_TOP * 0.4) + (2 * 16);
+  const containerTop = headerTop - (12 * SCALE);
+  const containerHeight = contentHeight + (contentTop - headerTop) + (12 * SCALE);
 
   const canScroll = scrollData.scrollHeight > scrollData.clientHeight;
   const thumbHeightRatio = canScroll ? Math.max(0.15, scrollData.clientHeight / scrollData.scrollHeight) : 1;
-  const scrollTrackH = contentHeight - 24 * SCALE;
+  const scrollTrackH = scrollData.clientHeight - 24 * SCALE;
   const thumbH = scrollTrackH * thumbHeightRatio;
   const maxScrollTop = scrollData.scrollHeight - scrollData.clientHeight;
   const scrollProgress = canScroll && maxScrollTop > 0 ? scrollData.scrollTop / maxScrollTop : 0;
@@ -102,18 +106,6 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
         transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       }}>
 
-        {/* ── Header ── */}
-        <div style={{ 
-          position: 'absolute', top: (34 * SCALE) - (CROP_TOP * 0.4) + (2 * 16), left: '50%', transform: 'translateX(-50%)',
-          zIndex: 30, display: 'flex', alignItems: 'center', gap: 12 * SCALE,
-          fontFamily: "'Press Start 2P', monospace", fontSize: 16 * SCALE,
-          color: '#f0e0a0', textShadow: '2px 2px 0 #3a2000',
-          letterSpacing: '0.1em'
-        }}>
-          <History size={20 * SCALE} />
-          STORY LOG
-        </div>
-
         {/* ── Wooden frame ── */}
         <img src="/settings-sprite-frame.webp" alt="" draggable={false} style={{
           position: 'absolute', top: -CROP_TOP, left: 0,
@@ -121,85 +113,100 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
           imageRendering: 'pixelated',
         }}/>
 
-        {/* ── Content area ── */}
+        {/* ── Inner Window (Darkened Container) ── */}
         <div style={{
           position: 'absolute',
-          top: contentTop,
+          top: containerTop,
           left: CONTENT_SIDE,
           right: CONTENT_SIDE,
-          height: contentHeight,
-          zIndex: 10, display: 'flex', overflow: 'hidden',
+          height: containerHeight,
+          zIndex: 10,
+          background: 'rgba(12,8,4,0.85)',
           borderRadius: '4px',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}>
-          {/* Darkened bg inside the hole */}
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(12,8,4,0.85)' }}/>
-
-          {/* Scrollable content */}
-          <div 
-            ref={scrollRef}
-            onScroll={updateScrollData}
-            style={{
-              position: 'relative', zIndex: 2, flex: 1, overflowY: 'auto',
-              scrollbarWidth: 'none',
-              padding: `${24 * SCALE}px ${36 * SCALE}px ${24 * SCALE}px ${32 * SCALE}px`,
-              display: 'flex', flexDirection: 'column', gap: 20 * SCALE,
-            }}
-          >
-            {history.length === 0 ? (
-              <div style={{ 
-                height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#6a4a28', fontFamily: "'Press Start 2P', monospace", fontSize: 12 * SCALE,
-                opacity: 0.5, textAlign: 'center'
-              }}>
-                The chronicles are empty...
-              </div>
-            ) : (
-              history.map((entry, i) => (
-                <div key={i} style={{ 
-                  display: 'flex', flexDirection: 'column', gap: 6 * SCALE,
-                  borderLeft: entry.type === 'dialogue' ? '2px solid rgba(212, 160, 96, 0.3)' : '2px solid rgba(106, 74, 40, 0.2)',
-                  paddingLeft: 16 * SCALE,
-                }}>
-                  <div style={{ 
-                    display: 'flex', alignItems: 'center', gap: 8 * SCALE,
-                    fontFamily: "'Press Start 2P', monospace", fontSize: 10 * SCALE,
-                    color: entry.type === 'dialogue' ? '#d4a060' : '#8a6838',
-                    textTransform: 'uppercase', opacity: 0.8
-                  }}>
-                    {entry.type === 'dialogue' ? <Sparkles size={10 * SCALE} /> : <ScrollText size={10 * SCALE} />}
-                    {entry.speaker}
-                  </div>
-                  <p style={{ 
-                    fontFamily: "'VT323', monospace", fontSize: 22 * SCALE,
-                    color: entry.type === 'dialogue' ? '#ddd0b0' : '#b0a080',
-                    lineHeight: 1.4, margin: 0, whiteSpace: 'pre-wrap'
-                  }}>
-                    {entry.text}
-                  </p>
-                </div>
-              ))
-            )}
-            <div style={{ height: 20 * SCALE }} /> {/* Bottom padding */}
+          {/* Header */}
+          <div style={{ 
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 * SCALE,
+            paddingTop: 16 * SCALE, paddingBottom: 12 * SCALE,
+            fontFamily: "'Press Start 2P', monospace", fontSize: 16 * SCALE,
+            color: '#f0e0a0', textShadow: '2px 2px 0 #3a2000',
+            letterSpacing: '0.1em', flexShrink: 0,
+          }}>
+            <History size={20 * SCALE} />
+            STORY LOG
           </div>
 
-          {/* Right scrollbar */}
-          {canScroll && (
-            <div style={{
-              position: 'absolute', right: 10 * SCALE, top: 12 * SCALE, bottom: 12 * SCALE, width: 14 * SCALE,
-              background: 'rgba(12,8,4,0.4)', border: '1px solid rgba(74,48,32,0.3)',
-              borderRadius: 4 * SCALE,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3,
-            }}>
-              <div style={{ flex: 1, position: 'relative', width: '100%' }}>
-                <div style={{
-                  position: 'absolute', top: thumbTop, left: '20%', right: '20%', height: thumbH,
-                  background: 'linear-gradient(90deg,#7a5a30 0%,#4a3020 100%)',
-                  borderRadius: 3 * SCALE, border: '1px solid #8a6838', pointerEvents: 'none',
-                  boxShadow: '0 0 6px rgba(0,0,0,0.3)',
-                }}/>
-              </div>
+          {/* Scrollable area wrapper */}
+          <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex' }}>
+            <div 
+              ref={scrollRef}
+              onScroll={updateScrollData}
+              style={{
+                position: 'relative', zIndex: 2, flex: 1, overflowY: 'auto',
+                scrollbarWidth: 'none',
+                padding: `0 ${36 * SCALE}px ${24 * SCALE}px ${32 * SCALE}px`,
+                display: 'flex', flexDirection: 'column', gap: 20 * SCALE,
+              }}
+            >
+              {history.length === 0 ? (
+                <div style={{ 
+                  height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#6a4a28', fontFamily: "'Press Start 2P', monospace", fontSize: 12 * SCALE,
+                  opacity: 0.5, textAlign: 'center'
+                }}>
+                  The chronicles are empty...
+                </div>
+              ) : (
+                history.map((entry, i) => (
+                  <div key={i} style={{ 
+                    display: 'flex', flexDirection: 'column', gap: 6 * SCALE,
+                    borderLeft: entry.type === 'dialogue' ? '2px solid rgba(212, 160, 96, 0.3)' : '2px solid rgba(106, 74, 40, 0.2)',
+                    paddingLeft: 16 * SCALE,
+                  }}>
+                    <div style={{ 
+                      display: 'flex', alignItems: 'center', gap: 8 * SCALE,
+                      fontFamily: "'Press Start 2P', monospace", fontSize: 10 * SCALE,
+                      color: entry.type === 'dialogue' ? '#d4a060' : '#8a6838',
+                      textTransform: 'uppercase', opacity: 0.8
+                    }}>
+                      {entry.type === 'dialogue' ? <Sparkles size={10 * SCALE} /> : <ScrollText size={10 * SCALE} />}
+                      {entry.speaker}
+                    </div>
+                    <p style={{ 
+                      fontFamily: "'VT323', monospace", fontSize: 22 * SCALE,
+                      color: entry.type === 'dialogue' ? '#ddd0b0' : '#b0a080',
+                      lineHeight: 1.4, margin: 0, whiteSpace: 'pre-wrap'
+                    }}>
+                      {entry.text}
+                    </p>
+                  </div>
+                ))
+              )}
+              <div style={{ height: 20 * SCALE }} /> {/* Bottom padding */}
             </div>
-          )}
+
+            {/* Right scrollbar */}
+            {canScroll && (
+              <div style={{
+                position: 'absolute', right: 10 * SCALE, top: 0, bottom: 12 * SCALE, width: 14 * SCALE,
+                background: 'rgba(12,8,4,0.4)', border: '1px solid rgba(74,48,32,0.3)',
+                borderRadius: 4 * SCALE,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3,
+              }}>
+                <div style={{ flex: 1, position: 'relative', width: '100%' }}>
+                  <div style={{
+                    position: 'absolute', top: thumbTop, left: '20%', right: '20%', height: thumbH,
+                    background: 'linear-gradient(90deg,#7a5a30 0%,#4a3020 100%)',
+                    borderRadius: 3 * SCALE, border: '1px solid #8a6838', pointerEvents: 'none',
+                    boxShadow: '0 0 6px rgba(0,0,0,0.3)',
+                  }}/>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Close button ── */}

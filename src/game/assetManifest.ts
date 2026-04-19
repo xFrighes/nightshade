@@ -53,12 +53,11 @@ export const PHASER_ASSET_URLS = [
   '/bg_underground.webp',
   '/rat.webp',
   '/guide.webp',
-  '/player_sheet.webp',
+  '/elara.webp',
   '/player_sheet.json',
 ];
 
 const EXTRA_PUBLIC_ASSET_URLS = [
-  '/elara.webp',
   '/favicon.svg',
 ];
 

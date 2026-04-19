@@ -10,10 +10,8 @@ export interface NarrativeContext {
 }
 
 type KaelenPersonality = 'Cynical' | 'Honorable' | 'Cruel';
-type KaelenWeakness = 'Debt' | 'Family' | 'Superstition';
 
 const PERSONALITIES: KaelenPersonality[] = ['Cynical', 'Honorable', 'Cruel'];
-const WEAKNESSES: KaelenWeakness[] = ['Debt', 'Family', 'Superstition'];
 
 const TEXT_MODEL = 'gemini-2.5-flash';
 
@@ -28,8 +26,6 @@ export class GeminiService {
 
   static readonly kaelenPersonality: KaelenPersonality =
     PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
-  static readonly kaelenWeakness: KaelenWeakness =
-    WEAKNESSES[Math.floor(Math.random() * WEAKNESSES.length)];
 
   private static getAI(): GoogleGenAI {
     return new GoogleGenAI({ apiKey: this.API_KEY });
@@ -39,13 +35,13 @@ export class GeminiService {
     return `Roleplay as Kaelen, a weary guard in the Iron Cell.
 Context: Elara is trying to escape.
 Personality: ${this.kaelenPersonality}.
-Secret Weakness: ${this.kaelenWeakness}.
 
 Rules:
 1. Keep responses under 2 sentences. Gritty, low-fantasy tone. No emojis.
-2. If Elara exploits your weakness (mentions ${this.kaelenWeakness.toLowerCase()}, or alludes to it meaningfully), shift to merciful and end your response with [ESCAPE_SUCCESS].
+2. If Elara makes a meaningful appeal to your oath, conscience, protecting families/innocents, refusing corrupt orders, and avoiding bloodshed, shift to merciful and end your response with [ESCAPE_SUCCESS].
 3. If mood is already merciful, always end your response with [ESCAPE_SUCCESS].
-4. Use prior dialogue for continuity. Never break character.`;
+4. If Elara asks about your orders, oath, family, fear, Silas, or the city, reveal a concrete clue about your conflict without granting escape yet.
+5. Use prior dialogue for continuity. Never break character.`;
   }
 
   /**
@@ -134,7 +130,7 @@ Recent dialogue: ${state.dialogueHistory.slice(-6).join(' | ') || 'None yet.'}`,
    * One-shot rat hint via standard text generation (Live not needed for single-turn).
    */
   static async generateRatHint(): Promise<string> {
-    const fallback = `*Squeak*... the iron man carries a wound older than his orders — find the crack in his ${this.kaelenWeakness.toLowerCase()}.`;
+    const fallback = '*Squeak*... the iron man still remembers an oath older than his orders; promise no blood and make him choose what he was meant to protect.';
 
     if (!this.API_KEY) return fallback;
 
@@ -144,9 +140,8 @@ Recent dialogue: ${state.dialogueHistory.slice(-6).join(' | ') || 'None yet.'}`,
         model: TEXT_MODEL,
         config: {
           systemInstruction: `You are the Iron Cell Rat. You have been paid in coin.
-The guard Kaelen's secret weakness is: ${this.kaelenWeakness}.
-Give exactly 1 sentence — cryptic, squeaky (use *Squeak* sounds), never name the weakness directly.
-Example: "*Squeak*... he fears what he cannot see in the shadows."`,
+The guard Kaelen's exploitable conflict is his oath to protect families and innocents versus corrupt orders, especially if Elara promises no blood.
+Give exactly 1 sentence — cryptic, squeaky (use *Squeak* sounds), hint at oath, orders, and no blood without writing the exact winning sentence.`,
         },
         contents: 'Give me your hint about the guard.',
       });

@@ -90,7 +90,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image('bg_underground', '/bg_underground.webp');
     this.load.image('rat', '/rat.webp');
     this.load.spritesheet('guide', '/guide.webp', { frameWidth: 170, frameHeight: 279 });
-    this.load.atlas('player_anim', '/player_sheet.webp', '/player_sheet.json');
+    this.load.atlas('player_anim', '/elara.webp', '/player_sheet.json');
 
     this.load.audio('sfx_jump', '/sounds/jump.wav');
     this.load.audio('sfx_collect', '/sounds/collect.wav');
@@ -103,7 +103,7 @@ export class GameScene extends Phaser.Scene {
 
   private getWorldHeight() { return this.scale.height + 400; }
   private getBaseY() { return this.scale.height - this.v(72); }
-  private getPlayerScale() { return (this.v(262) / 500) * 1.6; }
+  private getPlayerScale() { return (this.v(262) / 618) * 1.6; }
 
   create() {
     const { height } = this.scale;
