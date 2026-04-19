@@ -380,7 +380,7 @@ export class GameScene extends Phaser.Scene {
     const kaelen = this.add.sprite(x, y, 'guide')
       .setOrigin(0.5, 1)
       .setDepth(22)
-      .setScale(this.getPlayerScale() * (500 / 279))
+      .setScale(this.getPlayerScale() * (618 / 279))
       .setName('kaelen_visual');
 
     if (this.anims.exists('guide-idle')) {
