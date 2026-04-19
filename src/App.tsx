@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type * as Phaser from 'phaser';
-import { ChevronRight, Heart, KeyRound, Package, RotateCcw, ScrollText, Shield, Sparkles, X } from 'lucide-react';
+import { ChevronRight, Heart, KeyRound, Loader2, Package, RotateCcw, ScrollText, Shield, Sparkles, Wallet, X } from 'lucide-react';
 import { PhaserGame } from './components/PhaserGame';
 import { SettingsWindow } from './components/SettingsWindow';
 import { GeminiService } from './services/GeminiService';
+import { SolanaService } from './services/SolanaService';
 import {
   INITIAL_STORY_STATE,
   STORY_ITEMS,
@@ -24,6 +24,8 @@ type DialogState = {
   speaker: string;
   text: string;
   options: DialogOption[];
+  inputMode?: boolean;
+  onInput?: (text: string) => void;
 };
 
 type CombatState = {
@@ -42,20 +44,60 @@ const sceneObjectives: Record<StorySceneId, string> = {
 
 const App: React.FC = () => {
   const [isGameStarted, setIsGameStarted] = useState(() => new URLSearchParams(window.location.search).has('autostart'));
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPreloaded, setIsPreloaded] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [story, setStory] = useState<StoryState>(() => loadStory());
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [combat, setCombat] = useState<CombatState | null>(null);
-  const [gameInstance, setGameInstance] = useState<Phaser.Game | null>(null);
+  const [openingShown, setOpeningShown] = useState(false);
+  const [uiVisible, setUiVisible] = useState(true);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [showReveal, setShowReveal] = useState(false);
+  const [hudKey, setHudKey] = useState(0);
+  const storyRef = React.useRef(story);
+  storyRef.current = story;
+
+  useEffect(() => {
+    const images = ['/starting-screen.png', '/bg.png'];
+    let loadedCount = 0;
+    images.forEach(src => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === images.length) setIsPreloaded(true);
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount === images.length) setIsPreloaded(true);
+      };
+    });
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('shadow_toll_story', JSON.stringify(story));
   }, [story]);
 
+  // Opening monologue — fires once after the Phaser intro fades
+  useEffect(() => {
+    if (!isGameStarted || openingShown) return;
+    if (story.scene !== 'cell' || story.dialogueHistory.length > 0) return;
+    const timer = setTimeout(() => {
+      setOpeningShown(true);
+      setDialog({
+        speaker: 'Elara',
+        text: 'Cold stone. Iron bars. My breath fogs the dark. Nothing in my hands.\n\nKaelen is on watch through the bars. There has to be a way out of here.',
+        options: [{ label: 'Look for a way out', action: () => setDialog(null) }],
+      });
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [isGameStarted, openingShown, story.scene, story.dialogueHistory.length]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === 'i') setInventoryOpen((open) => !open);
       if (event.key === 'Escape') {
         setDialog(null);
         setInventoryOpen(false);
@@ -101,11 +143,6 @@ const App: React.FC = () => {
   const handleGameAction = (action: GameAction) => {
     if (combat) return;
 
-    if (action.type === 'collect' && action.target === 'collect_dagger') {
-      updateStory((state) => addItem({ ...state, flags: { ...state.flags, daggerFound: true } }, 'iron_dagger'));
-      return;
-    }
-
     if (action.type === 'collect' && action.target === 'collect_coin') {
       updateStory((state) => addItem({
         ...state,
@@ -124,7 +161,7 @@ const App: React.FC = () => {
 
     const handlers: Record<string, () => void> = {
       kaelen: openKaelenCell,
-      rat: distractRat,
+      rat: interactRat,
       cell_exit: () => goToScene('market', 'Elara crawls through the drain into the lantern-lit Under-Market.'),
       silas: openSilas,
       market_exit: () => goToScene('cathedral', 'Gate pass in hand, Elara climbs into the Cathedral Ward.'),
@@ -139,73 +176,122 @@ const App: React.FC = () => {
     handlers[action.target]?.();
   };
 
-  const distractRat = () => {
-    if (!hasItem('bread')) {
+  const interactRat = () => {
+    if (story.flags.ratPaid) {
       setDialog({
         speaker: 'Guard-rat',
-        text: 'The rat bares yellow teeth. You have nothing it wants.',
-        options: [{ label: 'Back away', action: () => setDialog(null) }],
+        text: 'The rat has gone. Only scratch marks and the smell of coin remain.',
+        options: [{ label: 'Step away', action: () => setDialog(null) }],
       });
       return;
     }
 
-    updateStory((state) => addLog({
-      ...removeItem(state, 'bread'),
-      flags: { ...state.flags, ratDistracted: true },
-    }, 'The Bread skids into the dark. The guard-rat follows it, leaving the bars unwatched.'));
+    setDialog({
+      speaker: 'Guard-rat',
+      text: 'The rat fixes you with one glassy eye. It knows something. It wants coin.',
+      options: [
+        {
+          label: walletAddress ? 'Slip it 0.01 SOL (Devnet)' : 'Connect wallet to bribe the rat',
+          disabled: isAiLoading,
+          action: async () => {
+            if (!walletAddress) {
+              try {
+                const addr = await SolanaService.connect();
+                setWalletAddress(addr);
+                setDialog({
+                  speaker: 'Guard-rat',
+                  text: 'Wallet connected. Try again to pay the rat.',
+                  options: [{ label: 'Understood', action: () => setDialog(null) }],
+                });
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : 'Unknown wallet error.';
+                setDialog({
+                  speaker: 'Guard-rat',
+                  text: `*Squeak*... no wallet found. ${msg}`,
+                  options: [{ label: 'Back away', action: () => setDialog(null) }],
+                });
+              }
+              return;
+            }
+
+            setIsAiLoading(true);
+            setDialog({ speaker: 'Guard-rat', text: '*Squeak*... counting the coin...', options: [] });
+
+            try {
+              await SolanaService.sendBribe(walletAddress);
+              const hint = await GeminiService.generateRatHint();
+              updateStory((state) => addLog({
+                ...state,
+                flags: { ...state.flags, ratPaid: true },
+              }, `Rat hint: ${hint}`));
+              setDialog({
+                speaker: 'Guard-rat',
+                text: hint,
+                options: [{ label: 'Remember the hint', action: () => setDialog(null) }],
+              });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Transaction failed.';
+              setDialog({
+                speaker: 'Guard-rat',
+                text: `*Squeak*... the coin bounced back. ${msg}`,
+                options: [{ label: 'Back away', action: () => setDialog(null) }],
+              });
+            } finally {
+              setIsAiLoading(false);
+            }
+          },
+        },
+        { label: 'Back away', action: () => setDialog(null) },
+      ],
+    });
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleCellKaelenInput = React.useCallback(async (playerLine: string) => {
+    setIsAiLoading(true);
+    setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
+    try {
+      const { line, escaped } = await GeminiService.generateKaelenResponse(
+        playerLine, storyRef.current.dialogueHistory,
+      );
+      updateStory(state => recordChoice(state, playerLine));
+      if (escaped) {
+        updateStory(state => addItem(addLog({
+          ...state, flags: { ...state.flags, kaelenMood: 'merciful' },
+        }, 'Kaelen slides the key under the bars.'), 'rusted_key'));
+        setDialog({
+          speaker: 'Kaelen',
+          text: line || "Kaelen slides a key under the bars without a word.",
+          options: [{ label: 'Take the key', action: () => setDialog(null) }],
+        });
+      } else {
+        updateStory(state => ({ ...state, flags: { ...state.flags, kaelenMood: 'hostile' } }));
+        setDialog({
+          speaker: 'Kaelen',
+          text: line,
+          options: [{ label: 'Walk away', action: () => setDialog(null) }],
+          inputMode: true,
+          onInput: handleCellKaelenInput,
+        });
+      }
+    } catch {
+      setDialog({
+        speaker: 'Kaelen',
+        text: 'Kaelen turns away without a word.',
+        options: [{ label: 'Step back', action: () => setDialog(null) }],
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
+  }, []); // stable — reads fresh story via storyRef
 
   const openKaelenCell = () => {
     setDialog({
       speaker: 'Kaelen',
-      text: 'The veteran guard keeps one hand on his spear. His eyes are tired, but not empty.',
-      options: [
-        {
-          label: 'Appeal to his honor',
-          action: () => {
-            const result = GeminiService.judgeKaelenMood('honor');
-            updateStory((state) => addItem(recordChoice({
-              ...state,
-              flags: { ...state.flags, kaelenMood: result.mood },
-            }, 'Appealed to Kaelen honor'), 'rusted_key'));
-            setDialog({
-              speaker: 'Kaelen',
-              text: result.line,
-              options: [{ label: 'Take the key', action: () => setDialog(null) }],
-            });
-          },
-        },
-        {
-          label: 'Demand he opens the cell',
-          action: () => {
-            const result = GeminiService.judgeKaelenMood('aggressive');
-            updateStory((state) => recordChoice({
-              ...state,
-              flags: { ...state.flags, kaelenMood: result.mood },
-            }, 'Threatened Kaelen in the cell'));
-            setDialog({
-              speaker: 'Kaelen',
-              text: result.line,
-              options: [{ label: 'Step back', action: () => setDialog(null) }],
-            });
-          },
-        },
-        {
-          label: 'Ask about the rat and the bars',
-          action: () => {
-            const result = GeminiService.judgeKaelenMood('trade');
-            updateStory((state) => recordChoice({
-              ...state,
-              flags: { ...state.flags, kaelenMood: result.mood },
-            }, 'Asked Kaelen for practical help'));
-            setDialog({
-              speaker: 'Kaelen',
-              text: result.line,
-              options: [{ label: 'Use the Bread on the rat', action: () => setDialog(null) }],
-            });
-          },
-        },
-      ],
+      text: 'The guard keeps one hand on his spear. His eyes are tired — but not empty.',
+      options: [{ label: 'Back away', action: () => setDialog(null) }],
+      inputMode: true,
+      onInput: handleCellKaelenInput,
     });
   };
 
@@ -218,16 +304,6 @@ const App: React.FC = () => {
           label: 'Pay with the Coin Pouch',
           disabled: !hasItem('coin_pouch'),
           action: () => resolveSilas('pay', false),
-        },
-        {
-          label: 'Threaten him with the Iron Dagger',
-          disabled: !hasItem('iron_dagger'),
-          action: () => resolveSilas('threaten', false),
-        },
-        {
-          label: 'Kill Silas and take the pass',
-          disabled: !hasItem('iron_dagger'),
-          action: () => resolveSilas('threaten', true),
         },
         {
           label: 'Accept the favor he demands',
@@ -301,45 +377,55 @@ const App: React.FC = () => {
     });
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleGateKaelenInput = React.useCallback(async (playerLine: string) => {
+    setIsAiLoading(true);
+    setDialog(prev => prev ? { ...prev, text: '...', options: [], inputMode: false } : null);
+    try {
+      const { line, escaped } = await GeminiService.generateKaelenResponse(
+        playerLine, storyRef.current.dialogueHistory,
+      );
+      updateStory(state => recordChoice(state, playerLine));
+      if (escaped) {
+        updateStory(state => addLog(recordChoice({
+          ...state, flags: { ...state.flags, kaelenMood: 'merciful', gateOutcome: 'persuaded' },
+        }, playerLine), 'Kaelen lowers his spear and lets Elara pass.'));
+        setDialog({
+          speaker: 'Kaelen',
+          text: line || "Kaelen steps aside. His eyes say he won't report this.",
+          options: [{ label: 'Walk through the gate', action: () => goToScene('outskirts', 'Kaelen turns his back on the order and opens the way.') }],
+        });
+      } else {
+        setDialog({
+          speaker: 'Kaelen',
+          text: line,
+          options: [{ label: 'Draw steel', action: startCombat }],
+          inputMode: true,
+          onInput: handleGateKaelenInput,
+        });
+      }
+    } catch {
+      setDialog({
+        speaker: 'Kaelen',
+        text: '"Enough words." Kaelen raises his spear.',
+        options: [{ label: 'Fight', action: startCombat }],
+      });
+    } finally {
+      setIsAiLoading(false);
+    }
+  }, []); // stable — reads fresh story via storyRef
+
   const openGateKaelen = () => {
-    const canPersuade = story.flags.kaelenMood === 'honorable' || story.flags.kaelenMood === 'guarded';
     setDialog({
       speaker: 'Kaelen',
       text: 'Kaelen blocks the bridge, helmet under one arm. "Orders say you stop here. My conscience has been less clear."',
       options: [
-        {
-          label: 'Ask him to remember his honor',
-          action: () => {
-            if (canPersuade) {
-              updateStory((state) => addLog(recordChoice({
-                ...state,
-                flags: { ...state.flags, kaelenMood: 'merciful', gateOutcome: 'persuaded' },
-              }, 'Persuaded Kaelen at the gate'), 'Kaelen lowers his spear and lets Elara pass.'));
-              goToScene('outskirts', 'Kaelen turns his back on the order and opens the way.');
-            } else {
-              setDialog({
-                speaker: 'Kaelen',
-                text: '"You wanted threats. Now you have a soldier."',
-                options: [{ label: 'Fight', action: startCombat }],
-              });
-            }
-          },
-        },
-        {
-          label: 'Use the Rusted Key side-path',
-          disabled: !hasItem('rusted_key'),
-          action: useGateKey,
-        },
-        {
-          label: 'Blast the gate with the Purple Rune',
-          disabled: !hasItem('purple_rune'),
-          action: blastRuneGate,
-        },
-        {
-          label: 'Draw steel',
-          action: startCombat,
-        },
+        { label: 'Use the Rusted Key side-path', disabled: !hasItem('rusted_key'), action: useGateKey },
+        { label: 'Blast the gate with the Purple Rune', disabled: !hasItem('purple_rune'), action: blastRuneGate },
+        { label: 'Draw steel', action: startCombat },
       ],
+      inputMode: true,
+      onInput: handleGateKaelenInput,
     });
   };
 
@@ -442,30 +528,48 @@ const App: React.FC = () => {
     setDialog(null);
     setCombat(null);
     setInventoryOpen(false);
-  };
-
-  const sendVirtualInput = (key: 'left' | 'right' | 'jump', active: boolean) => {
-    gameInstance?.events.emit('virtual_input', { key, active });
-  };
-
-  const sendVirtualInteract = () => {
-    gameInstance?.events.emit('virtual_interact');
+    setOpeningShown(false);
   };
 
   const handleStartGame = () => {
+    resetGame();
     setIsGameStarted(true);
+    setIsLoading(true);
   };
+
+  const handleLoadGame = () => {
+    setIsGameStarted(true);
+    setIsLoading(true);
+  };
+
+  const handleLoadingComplete = () => {
+    setIsLoading(false);
+    setShowReveal(true);
+    setHudKey(k => k + 1);
+    setTimeout(() => setShowReveal(false), 1500);
+  };
+
+  const hasSave = useMemo(() => localStorage.getItem('shadow_toll_story') !== null, [isGameStarted]);
 
   if (!isGameStarted) {
     return (
-      <div
-        className="fixed inset-0 flex flex-col items-center justify-center p-8 bg-cover bg-center bg-no-repeat font-pixel"
-        style={{ backgroundImage: "url('/starting-screen.png')" }}
-      >
+      <div className="fixed inset-0 flex flex-col items-center justify-center p-8 font-pixel bg-[#08060d]">
+        <img 
+          src="/starting-screen.png" 
+          className="absolute inset-0 w-full h-full object-cover -z-10" 
+          alt=""
+          style={{ opacity: isPreloaded ? 1 : 0, transition: 'opacity 0.8s ease' }}
+          loading="eager"
+          // @ts-ignore - fetchpriority is a new attribute
+          fetchpriority="high"
+        />
         <div className="absolute inset-0 bg-black/10" />
 
-        {!isSettingsOpen && (
-          <div className="w-full max-w-lg flex flex-col items-center gap-6 relative z-10 mt-[32rem] font-['Press_Start_2P']">
+        {isPreloaded && !isSettingsOpen && (
+          <div 
+            className="w-full max-w-lg flex flex-col items-center gap-6 relative z-10 mt-[32rem] font-['Press_Start_2P']"
+            style={{ animation: 'fadeIn 0.5s ease-out forwards' }}
+          >
             <button
               onClick={handleStartGame}
               className="group relative flex items-center justify-center text-white text-2xl uppercase cursor-pointer transition-all hover:scale-105"
@@ -476,24 +580,30 @@ const App: React.FC = () => {
             </button>
 
             <button
-              className="text-white/80 text-xl uppercase cursor-not-allowed opacity-60 hover:opacity-100 transition-opacity"
+              onClick={hasSave ? handleLoadGame : undefined}
+              className={`group relative flex items-center justify-center text-white/80 text-xl uppercase transition-all ${
+                hasSave ? 'cursor-pointer hover:opacity-100 hover:scale-105' : 'cursor-not-allowed opacity-60'
+              }`}
               style={{ textShadow: '2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}
             >
+              <span className="absolute -left-10 group-hover:opacity-100 opacity-0 transition-opacity">{">"}</span>
               [LOAD GAME]
             </button>
 
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="text-white/80 text-xl uppercase cursor-pointer hover:opacity-100 transition-opacity"
+              className="group relative flex items-center justify-center text-white/80 text-xl uppercase cursor-pointer transition-all hover:opacity-100 hover:scale-105"
               style={{ textShadow: '2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}
             >
+              <span className="absolute -left-10 group-hover:opacity-100 opacity-0 transition-opacity">{">"}</span>
               [SETTINGS]
             </button>
 
             <button
-              className="text-white/80 text-xl uppercase cursor-not-allowed opacity-60 hover:opacity-100 transition-opacity"
+              className="group relative flex items-center justify-center text-white/80 text-xl uppercase cursor-not-allowed opacity-60 transition-all hover:opacity-100 hover:scale-105"
               style={{ textShadow: '2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}
             >
+              <span className="absolute -left-10 group-hover:opacity-100 opacity-0 transition-opacity">{">"}</span>
               [QUIT]
             </button>
           </div>
@@ -506,67 +616,96 @@ const App: React.FC = () => {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-game-bg select-none font-pixel">
-      <PhaserGame storyState={story} onGameAction={handleGameAction} onGameReady={setGameInstance} />
+      <div style={{ visibility: isLoading ? 'hidden' : 'visible' }}>
+        <PhaserGame 
+          storyState={story} 
+          uiVisible={uiVisible} 
+          onGameAction={handleGameAction} 
+          onToggleUI={() => setUiVisible(v => !v)}
+          onToggleInventory={() => setInventoryOpen(v => !v)}
+        />
+      </div>
 
-      <div className="game-hud">
-        <div className="hud-card hero-status">
-          <div className="hero-medallion"><Shield size={28} /></div>
-          <div>
-            <strong>Elara</strong>
-            <span>{sceneObjectives[story.scene]}</span>
+      {isLoading && <LoadingScreen onComplete={handleLoadingComplete} />}
+
+      {showReveal && <div className="game-reveal-overlay" />}
+
+      {!isLoading && uiVisible && (
+        <React.Fragment key={hudKey}>
+          <div className="game-hud">
+            <div className="hud-card hero-status">
+              <div className="hero-medallion">
+                <Shield size={32} />
+              </div>
+              <div>
+                <strong>ELARA</strong>
+                <span>{sceneObjectives[story.scene]}</span>
+              </div>
+              <div className="health-row">
+                {Array.from({ length: story.maxHealth }).map((_, index) => (
+                  <Heart key={index} size={18} fill={index < story.health ? 'currentColor' : 'none'} />
+                ))}
+              </div>
+            </div>
+
+            <button className="hud-button" onClick={() => setInventoryOpen(true)} title="Inventory">
+              <Package size={22} />
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px' }}>{inventory.length}</span>
+            </button>
+
+            <button
+              className="hud-button"
+              title={walletAddress ? `Connected: ${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}` : 'Connect Phantom wallet'}
+              onClick={async () => {
+                if (walletAddress) return;
+                try {
+                  const addr = await SolanaService.connect();
+                  setWalletAddress(addr);
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : 'Wallet error';
+                  console.warn('Wallet connect failed:', msg);
+                }
+              }}
+              style={{ opacity: walletAddress ? 1 : 0.6 }}
+            >
+              <Wallet size={22} />
+              {walletAddress && (
+                <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '9px' }}>
+                  {walletAddress.slice(0, 4)}
+                </span>
+              )}
+            </button>
+
+            <button className="hud-button" onClick={resetGame} title="Reset story">
+              <RotateCcw size={22} />
+            </button>
           </div>
-          <div className="health-row">
-            {Array.from({ length: story.maxHealth }).map((_, index) => (
-              <Heart key={index} size={16} fill={index < story.health ? 'currentColor' : 'none'} />
+
+          <div className="story-log">
+            <div className="story-log-title">
+              <ScrollText size={18} /> CHRONICLE
+            </div>
+            {story.log.map((entry, index) => (
+              <p key={`${entry}-${index}`}>{entry}</p>
             ))}
           </div>
-        </div>
 
-        <button className="hud-button" onClick={() => setInventoryOpen(true)} title="Inventory">
-          <Package size={18} />
-          <span>{inventory.length}</span>
-        </button>
-
-        <button className="hud-button" onClick={resetGame} title="Reset story">
-          <RotateCcw size={18} />
-        </button>
-      </div>
-
-      <div className="story-log">
-        <div className="story-log-title"><ScrollText size={16} /> Chronicle</div>
-        {story.log.map((entry, index) => <p key={`${entry}-${index}`}>{entry}</p>)}
-      </div>
-
-      <div className="quick-inventory">
-        {inventory.map((item) => (
-          <div key={item.id} className={item.id === 'purple_rune' ? 'slot cursed' : 'slot'} title={item.description}>
-            <span>{item.icon}</span>
-            <small>{item.name}</small>
+          <div className="quick-inventory">
+            {inventory.map((item) => (
+              <div key={item.id} className={item.id === 'purple_rune' ? 'slot cursed' : 'slot'} title={item.description}>
+                <span>{item.icon}</span>
+                <small>{item.name}</small>
+              </div>
+            ))}
+            <div className="gold">
+              <KeyRound size={16} />
+              <span style={{ fontSize: '14px' }}>{story.gold}</span>
+            </div>
           </div>
-        ))}
-        <div className="gold"><KeyRound size={14} /> {story.gold} gold</div>
-      </div>
+        </React.Fragment>
+      )}
 
-      <div className="touch-controls" aria-label="Game controls">
-        <button
-          onPointerDown={() => sendVirtualInput('left', true)}
-          onPointerUp={() => sendVirtualInput('left', false)}
-          onPointerLeave={() => sendVirtualInput('left', false)}
-        >
-          Left
-        </button>
-        <button
-          onPointerDown={() => sendVirtualInput('right', true)}
-          onPointerUp={() => sendVirtualInput('right', false)}
-          onPointerLeave={() => sendVirtualInput('right', false)}
-        >
-          Right
-        </button>
-        <button onPointerDown={() => sendVirtualInput('jump', true)}>Jump</button>
-        <button className="interact" onClick={sendVirtualInteract}>Interact</button>
-      </div>
-
-      {dialog && <DialogOverlay dialog={dialog} onClose={() => setDialog(null)} />}
+      {dialog && <DialogOverlay dialog={dialog} isLoading={isAiLoading} onClose={() => !isAiLoading && setDialog(null)} />}
       {inventoryOpen && <InventoryOverlay items={inventory} gold={story.gold} onClose={() => setInventoryOpen(false)} />}
       {combat && (
         <CombatOverlay
@@ -582,23 +721,60 @@ const App: React.FC = () => {
   );
 };
 
-const DialogOverlay: React.FC<{ dialog: DialogState; onClose: () => void }> = ({ dialog, onClose }) => (
-  <div className="dialog-shell">
-    <div className="dialog-panel">
-      <button className="dialog-close" onClick={onClose}><X size={18} /></button>
-      <div className="speaker"><Sparkles size={16} /> {dialog.speaker}</div>
-      <p>{dialog.text}</p>
-      <div className="dialog-options">
-        {dialog.options.map((option) => (
-          <button key={option.label} onClick={option.action} disabled={option.disabled}>
-            <ChevronRight size={16} />
-            {option.label}
-          </button>
-        ))}
+const DialogOverlay: React.FC<{ dialog: DialogState; isLoading?: boolean; onClose: () => void }> = ({ dialog, isLoading, onClose }) => {
+  const [inputText, setInputText] = React.useState('');
+
+  const handleSubmit = () => {
+    const trimmed = inputText.trim();
+    if (!trimmed || isLoading || !dialog.onInput) return;
+    setInputText('');
+    dialog.onInput(trimmed);
+  };
+
+  return (
+    <div className="dialog-shell">
+      <div className="dialog-panel">
+        <button className="dialog-close" onClick={onClose} disabled={isLoading}><X size={18} /></button>
+        <div className="speaker">
+          {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+          {dialog.speaker}
+        </div>
+        <p>{dialog.text}</p>
+
+        {dialog.inputMode && (
+          <div className="dialog-input-row">
+            <input
+              type="text"
+              className="dialog-input"
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') handleSubmit(); }}
+              placeholder="What do you say..."
+              disabled={isLoading}
+              autoFocus
+            />
+            <button
+              className="dialog-send"
+              onClick={handleSubmit}
+              disabled={isLoading || !inputText.trim()}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
+
+        <div className="dialog-options">
+          {dialog.options.map((option) => (
+            <button key={option.label} onClick={option.action} disabled={option.disabled || isLoading}>
+              <ChevronRight size={16} />
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const InventoryOverlay: React.FC<{
   items: Array<(typeof STORY_ITEMS)[StoryItemId]>;
@@ -618,7 +794,10 @@ const InventoryOverlay: React.FC<{
           </div>
         ))}
       </div>
-      <div className="inventory-gold">{gold} gold</div>
+      <div className="inventory-gold">
+        <KeyRound size={20} className="inline mr-2" />
+        {gold} GOLD
+      </div>
     </div>
   </div>
 );
@@ -630,16 +809,58 @@ const CombatOverlay: React.FC<{
   onRetry: () => void;
 }> = ({ combat, onStrike, onGuard, onRetry }) => {
   const defeated = combat.elara <= 0;
+  const elaraHP = (combat.elara / 6) * 100;
+  const kaelenHP = (combat.kaelen / 6) * 100;
 
   return (
     <div className="combat-overlay">
       <div className="combat-panel">
+        <button className="dialog-close" onClick={onRetry}><X size={18} /></button>
         <h2>Kaelen's Order</h2>
         <p>{defeated ? 'Elara falls to one knee. The bridge blurs. Try the duel again.' : combat.message}</p>
-        <div className="combat-bars">
-          <span>Elara {Math.max(0, combat.elara)} / 6</span>
-          <span>Kaelen {combat.kaelen} / 6</span>
+        
+        <div className="flex flex-col gap-6 mt-8">
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-end">
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px', color: '#ffe0a0' }}>ELARA</span>
+              <span style={{ fontSize: '14px', color: '#d4a373' }}>{Math.max(0, combat.elara)} / 6</span>
+            </div>
+            <div style={{
+              width: '100%', height: '12px',
+              background: 'rgba(0,0,0,0.6)',
+              border: '2px solid #4a3020',
+              position: 'relative',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            }}>
+              <div style={{
+                width: `${elaraHP}%`, height: '100%',
+                background: 'linear-gradient(180deg, #8a6838 0%, #c09050 50%, #8a6838 100%)',
+                transition: 'width 0.3s ease-out'
+              }} />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-end">
+              <span style={{ fontFamily: "'Press Start 2P', monospace", fontSize: '12px', color: '#ffe0a0' }}>KAELEN</span>
+              <span style={{ fontSize: '14px', color: '#d4a373' }}>{combat.kaelen} / 6</span>
+            </div>
+            <div style={{
+              width: '100%', height: '12px',
+              background: 'rgba(0,0,0,0.6)',
+              border: '2px solid #4a3020',
+              position: 'relative',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+            }}>
+              <div style={{
+                width: `${kaelenHP}%`, height: '100%',
+                background: 'linear-gradient(180deg, #581c1c 0%, #991b1b 50%, #581c1c 100%)',
+                transition: 'width 0.3s ease-out'
+              }} />
+            </div>
+          </div>
         </div>
+
         <div className="dialog-options">
           {defeated ? (
             <button onClick={onRetry}><RotateCcw size={16} /> Retry duel</button>
@@ -667,3 +888,113 @@ const loadStory = (): StoryState => {
 };
 
 export default App;
+
+const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+  const [progress, setProgress] = useState(0);
+  const onCompleteRef = React.useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    let currentProgress = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const updateProgress = () => {
+      const remaining = 100 - currentProgress;
+      const increment = Math.random() * (remaining * 0.3) + 1.0;
+      currentProgress = Math.min(currentProgress + increment, 99.9);
+      setProgress(currentProgress);
+
+      if (currentProgress < 99.9) {
+        const delay = Math.random() * 300 + 50;
+        timer = setTimeout(updateProgress, delay);
+      } else {
+        setTimeout(() => {
+          setProgress(100);
+          setTimeout(() => onCompleteRef.current(), 400);
+        }, 400);
+      }
+    };
+
+    const initialDelay = setTimeout(updateProgress, 200);
+    return () => {
+      clearTimeout(initialDelay);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 flex flex-col items-center justify-end pb-[15vh] font-pixel overflow-hidden z-[200]">
+      <img 
+        src="/starting-screen.png" 
+        className="absolute inset-0 w-full h-full object-cover -z-10" 
+        alt=""
+        loading="eager"
+        // @ts-ignore - fetchpriority is a new attribute
+        fetchpriority="high"
+      />
+      <div className="w-full max-w-lg flex flex-col items-center gap-4 relative z-10 px-8">
+        <div 
+          style={{ 
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: '1.5rem', /* text-2xl */
+            color: '#fff',
+            textShadow: '3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
+            marginRight: '-1.5rem', /* Offset the three dots to center the word "LOADING" */
+          }}
+          className="animate-pulse mb-6 uppercase"
+        >
+          LOADING...
+        </div>
+
+        <div className="w-full relative">
+          {/* Rounded Track */}
+          <div style={{
+            width: '100%', height: '14px',
+            background: 'rgba(0,0,0,0.6)',
+            border: '2px solid #4a3020',
+            borderRadius: '10px',
+            overflow: 'visible', /* Changed to visible to let the acorn hang over */
+            boxShadow: '0 4px 8px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            {/* Rounded Progress Fill */}
+            <div style={{
+              width: `${progress}%`, height: '100%',
+              background: 'linear-gradient(180deg, #8a6838 0%, #c09050 50%, #8a6838 100%)',
+              transition: 'width 0.4s ease-out',
+              borderRadius: '10px'
+            }} />
+            
+            {/* Acorn Indicator */}
+            <img 
+               src="/settings-sprite-acorn.png" 
+               alt="" 
+               draggable={false}
+               style={{
+                  position: 'absolute',
+                  left: `calc(${progress}% - 12px)`,
+                  top: '-10px',
+                  width: '24px',
+                  height: `${24 * (367/287)}px`,
+                  imageRendering: 'pixelated',
+                  transition: 'left 0.4s ease-out',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
+                  zIndex: 25
+               }}
+             />
+          </div>
+
+          {/* Percentage */}
+          <div style={{
+            position: 'absolute', top: '22px', right: '4px',
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: '10px', color: '#f0e0a0',
+            textShadow: '1px 1px 0 #000'
+          }}>
+            {Math.floor(progress)}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

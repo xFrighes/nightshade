@@ -261,26 +261,36 @@
 
 .hud-button,
 .dialog-options button {
-  border: 1px solid rgba(247, 210, 125, 0.58);
-  background: rgba(12, 9, 18, 0.78);
-  color: #f7d27d;
-  padding: 9px 16px;
-  font-size: 24px;
-  line-height: 1;
-  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+  background: #4a3728;
+  border: 4px solid #5d4037;
+  color: #e6ccb2;
+  padding: 8px 16px;
+  font-size: 16px;
+  font-family: 'Press Start 2P', monospace;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #2a1f18;
+  transition: transform 0.1s, box-shadow 0.1s, filter 0.1s;
+  line-height: 1.2;
 }
 
 .hud-button:hover,
 .dialog-options button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  background: rgba(82, 41, 116, 0.72);
-  border-color: #f7d27d;
+  filter: brightness(1.1);
+}
+
+.hud-button:active,
+.dialog-options button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #2a1f18;
 }
 
 .dialog-options button:disabled {
-  color: #756a78;
-  border-color: rgba(117, 106, 120, 0.35);
+  color: #8d6e63;
+  opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
+  background: #3e2723;
 }
 
 .game-hud {
@@ -291,7 +301,7 @@
   z-index: 40;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   pointer-events: none;
 }
 
@@ -301,88 +311,109 @@
 .dialog-panel,
 .inventory-panel,
 .combat-panel {
-  border: 1px solid rgba(247, 210, 125, 0.42);
-  background:
-    linear-gradient(180deg, rgba(32, 22, 42, 0.93), rgba(7, 6, 12, 0.92));
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38), inset 0 0 28px rgba(88, 42, 123, 0.2);
+  background: #1a1008;
+  border: 6px solid #4a3728;
+  box-shadow: 0 8px 0 #2a1f18, inset 0 0 40px rgba(0,0,0,0.8);
+  position: relative;
+}
+
+/* Add some grain/texture overlay to panels */
+.hud-card::before,
+.story-log::before,
+.dialog-panel::before,
+.inventory-panel::before,
+.combat-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3%3Ffilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  pointer-events: none;
 }
 
 .hero-status {
   width: min(720px, calc(100vw - 160px));
-  min-height: 78px;
+  min-height: 90px;
   display: grid;
-  grid-template-columns: 52px 1fr auto;
+  grid-template-columns: 64px 1fr auto;
   align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
+  gap: 16px;
+  padding: 16px 20px;
   pointer-events: auto;
 }
 
 .hero-medallion {
-  width: 52px;
-  height: 52px;
+  width: 64px;
+  height: 64px;
   display: grid;
   place-items: center;
-  color: #f7d27d;
-  background: rgba(247, 210, 125, 0.09);
-  border: 1px solid rgba(247, 210, 125, 0.28);
+  color: #ffe0a0;
+  background: #3e2723;
+  border: 4px solid #5d4037;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
 }
 
 .hero-status strong {
   display: block;
-  font-size: 34px;
-  line-height: 0.9;
-  color: #f7d27d;
+  font-size: 18px;
+  font-family: 'Press Start 2P', monospace;
+  color: #ffe0a0;
+  text-shadow: 2px 2px 0 #3a2000;
+  margin-bottom: 8px;
 }
 
 .hero-status span {
   display: block;
   max-width: 520px;
-  font-size: 22px;
-  line-height: 1.05;
-  color: #ded2e9;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #d4a373;
 }
 
 .health-row {
   display: flex;
-  gap: 3px;
+  gap: 4px;
   color: #ef4444;
+  filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.5));
 }
 
 .hud-button {
-  min-width: 48px;
-  height: 48px;
+  min-width: 54px;
+  height: 54px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   pointer-events: auto;
 }
 
 .story-log {
   position: fixed;
-  top: 118px;
+  top: 130px;
   left: 18px;
   z-index: 35;
-  width: min(380px, calc(100vw - 36px));
-  padding: 12px 14px;
-  color: #d8cbe0;
+  width: min(400px, calc(100vw - 36px));
+  padding: 16px 20px;
+  color: #e6ccb2;
   pointer-events: none;
 }
 
 .story-log-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  color: #f7d27d;
-  font-size: 24px;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  text-shadow: 2px 2px 0 #3a2000;
 }
 
 .story-log p {
-  margin: 0 0 6px;
-  font-size: 20px;
-  line-height: 1.05;
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.3;
+  color: #d4a373;
 }
 
 .quick-inventory {
@@ -392,84 +423,53 @@
   z-index: 35;
   display: flex;
   align-items: stretch;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 12px;
   pointer-events: auto;
 }
 
 .slot {
-  width: 74px;
-  height: 74px;
+  width: 80px;
+  height: 80px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 2px;
-  color: #f7d27d;
-  background: rgba(247, 210, 125, 0.08);
-  border: 1px solid rgba(247, 210, 125, 0.28);
+  gap: 4px;
+  color: #ffe0a0;
+  background: #3e2723;
+  border: 4px solid #5d4037;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
 }
 
 .slot.cursed {
   color: #d8b4fe;
-  box-shadow: inset 0 0 22px rgba(168, 85, 247, 0.34);
+  border-color: #6d28d9;
+  box-shadow: inset 0 0 22px rgba(168, 85, 247, 0.4);
 }
 
 .slot span {
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 28px;
 }
 
 .slot small {
-  max-width: 62px;
+  max-width: 68px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #ded2e9;
-  font-size: 14px;
+  color: #d4a373;
+  font-size: 11px;
 }
 
 .gold {
-  min-width: 72px;
+  min-width: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: #f7d27d;
-  font-size: 20px;
-}
-
-.touch-controls {
-  position: fixed;
-  left: 18px;
-  bottom: 18px;
-  z-index: 45;
-  display: flex;
   gap: 8px;
-  pointer-events: auto;
-}
-
-.touch-controls button {
-  min-width: 68px;
-  min-height: 52px;
-  border: 1px solid rgba(247, 210, 125, 0.5);
-  background: rgba(12, 9, 18, 0.78);
-  color: #f7d27d;
-  font-size: 22px;
-  line-height: 1;
-  touch-action: none;
-}
-
-.touch-controls button:hover,
-.touch-controls button:active {
-  background: rgba(82, 41, 116, 0.72);
-}
-
-.touch-controls .interact {
-  min-width: 104px;
-  color: #ffffff;
-  border-color: rgba(216, 180, 254, 0.74);
-  background: rgba(88, 28, 135, 0.78);
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
 }
 
 .dialog-shell,
@@ -481,54 +481,108 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 24px;
-  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.58));
+  padding: 32px;
+  background: radial-gradient(circle at center, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.8) 100%);
   pointer-events: auto;
+  animation: fadeIn 0.2s ease-out both;
 }
 
 .dialog-panel,
 .combat-panel {
   position: relative;
-  width: min(880px, calc(100vw - 32px));
-  padding: 24px;
-  color: #f5ebd6;
+  width: min(900px, calc(100vw - 32px));
+  padding: 32px;
+  color: #e6ccb2;
 }
 
 .speaker {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  color: #f7d27d;
-  font-size: 28px;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  text-shadow: 2px 2px 0 #3a2000;
 }
 
 .dialog-panel p,
 .combat-panel p {
   margin: 0;
-  min-height: 72px;
-  font-size: 28px;
-  line-height: 1.08;
+  min-height: 80px;
+  font-size: 22px;
+  line-height: 1.5;
 }
+
+.dialog-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+.dialog-input {
+  flex: 1;
+  background: #0e0a06;
+  border: 3px solid #5d4037;
+  color: #e6ccb2;
+  font-family: 'VT323', monospace;
+  font-size: 22px;
+  padding: 8px 14px;
+  outline: none;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);
+  transition: border-color 0.15s;
+}
+
+.dialog-input:focus {
+  border-color: #ffe0a0;
+}
+
+.dialog-input::placeholder {
+  color: #6b5040;
+  font-style: italic;
+}
+
+.dialog-send {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  background: #4a3728;
+  border: 3px solid #5d4037;
+  color: #ffe0a0;
+  cursor: pointer;
+  transition: filter 0.15s;
+  flex-shrink: 0;
+}
+
+.dialog-send:hover:not(:disabled) { filter: brightness(1.2); }
+.dialog-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .dialog-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: -12px;
+  right: -12px;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid rgba(247, 210, 125, 0.28);
-  color: #f7d27d;
-  background: rgba(7, 6, 12, 0.7);
+  width: 40px;
+  height: 40px;
+  background: #4a3728;
+  border: 4px solid #5d4037;
+  color: #ffe0a0;
+  box-shadow: 0 4px 0 #2a1f18;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.dialog-close:hover {
+  filter: brightness(1.2);
 }
 
 .dialog-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 24px;
 }
 
 .dialog-options button {
@@ -542,82 +596,90 @@
 .inventory-overlay,
 .combat-overlay {
   align-items: center;
-  background: rgba(0, 0, 0, 0.62);
 }
 
 .inventory-panel {
   position: relative;
-  width: min(840px, calc(100vw - 32px));
-  padding: 24px;
-  color: #f5ebd6;
+  width: min(860px, calc(100vw - 32px));
+  padding: 40px;
+  color: #e6ccb2;
 }
 
 .inventory-panel h2,
 .combat-panel h2 {
-  margin: 0 0 18px;
-  color: #f7d27d;
-  font-size: 42px;
+  margin: 0 0 24px;
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 28px;
+  text-shadow: 3px 3px 0 #3a2000;
+  text-transform: uppercase;
 }
 
 .inventory-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
 }
 
 .inventory-item {
-  min-height: 150px;
-  padding: 14px;
-  background: rgba(247, 210, 125, 0.07);
-  border: 1px solid rgba(247, 210, 125, 0.22);
+  min-height: 160px;
+  padding: 16px;
+  background: #3e2723;
+  border: 4px solid #5d4037;
+  box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
 }
 
 .inventory-item strong {
   display: block;
-  margin-bottom: 8px;
-  color: #f7d27d;
-  font-size: 30px;
+  margin-bottom: 10px;
+  color: #ffe0a0;
+  font-size: 32px;
 }
 
 .inventory-item span {
   display: block;
   color: #ffffff;
-  font-size: 24px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  margin-bottom: 8px;
 }
 
 .inventory-item p {
-  margin: 6px 0 0;
-  color: #d8cbe0;
-  font-size: 18px;
-  line-height: 1.1;
+  margin: 0;
+  color: #d4a373;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .inventory-gold {
-  margin-top: 16px;
-  color: #f7d27d;
-  font-size: 26px;
+  margin-top: 24px;
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 20px;
+  text-align: right;
 }
 
 .combat-bars {
   display: flex;
   justify-content: space-between;
-  gap: 14px;
-  margin-top: 14px;
-  color: #f7d27d;
-  font-size: 26px;
+  gap: 20px;
+  margin-top: 20px;
+  color: #ffe0a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 16px;
 }
 
 @media (max-width: 760px) {
   .game-hud {
-    top: 10px;
-    left: 10px;
-    right: 10px;
+    top: 12px;
+    left: 12px;
+    right: 12px;
   }
 
   .hero-status {
-    width: calc(100vw - 126px);
-    grid-template-columns: 42px 1fr;
-    min-height: 88px;
+    width: calc(100vw - 140px);
+    grid-template-columns: 52px 1fr;
+    min-height: 100px;
   }
 
   .health-row {
@@ -625,41 +687,29 @@
   }
 
   .hero-status strong {
-    font-size: 27px;
+    font-size: 14px;
   }
 
   .hero-status span,
   .story-log p {
-    font-size: 17px;
+    font-size: 13px;
   }
 
   .story-log {
-    top: 110px;
-    left: 10px;
+    top: 130px;
+    left: 12px;
   }
 
   .quick-inventory {
-    right: 10px;
-    bottom: 76px;
-    max-width: calc(100vw - 20px);
+    right: 12px;
+    bottom: 80px;
+    max-width: calc(100vw - 24px);
     overflow-x: auto;
-  }
-
-  .touch-controls {
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-  }
-
-  .touch-controls button {
-    flex: 1;
-    min-width: 0;
-    font-size: 19px;
   }
 
   .dialog-panel p,
   .combat-panel p {
-    font-size: 23px;
+    font-size: 18px;
   }
 }
 
@@ -767,7 +817,88 @@
 }
 
 .custom-checkbox.checked::after {
-  content: '✓';
-  color: #d4a373;
-  font-size: 20px;
+content: '✓';
+color: #d4a373;
+font-size: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scanline {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes hudSlideDown {
+  from { opacity: 0; transform: translateY(-28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes hudSlideLeft {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes hudSlideRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes hudSlideUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes revealFade {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; pointer-events: none; }
+}
+@keyframes panelPop {
+  0%   { transform: translateY(22px) scale(0.97); }
+  60%  { transform: translateY(-3px) scale(1.005); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes slotPop {
+  0%   { opacity: 0; transform: scale(0.7); }
+  70%  { transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-scanline {
+  animation: scanline 2s linear infinite;
+}
+
+/* ── Game reveal overlay (black fade after loading) ─── */
+.game-reveal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: black;
+  pointer-events: none;
+  animation: revealFade 1.4s ease-out forwards;
+}
+
+/* ── HUD entrance animations ─────────────────────────── */
+.game-hud {
+  animation: hudSlideDown 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.story-log {
+  animation: hudSlideLeft 0.55s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.quick-inventory {
+  animation: hudSlideRight 0.55s 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Stagger each inventory slot */
+.quick-inventory .slot:nth-child(1) { animation: slotPop 0.35s 0.25s ease-out both; }
+.quick-inventory .slot:nth-child(2) { animation: slotPop 0.35s 0.32s ease-out both; }
+.quick-inventory .slot:nth-child(3) { animation: slotPop 0.35s 0.39s ease-out both; }
+.quick-inventory .slot:nth-child(4) { animation: slotPop 0.35s 0.46s ease-out both; }
+.quick-inventory .gold            { animation: slotPop 0.35s 0.53s ease-out both; }
+
+/* ── Dialog / inventory / combat panel entrance ──────── */
+.dialog-panel,
+.inventory-panel,
+.combat-panel {
+  animation: panelPop 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

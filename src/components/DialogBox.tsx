@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { X, ChevronRight, Sparkles } from 'lucide-react';
 import { gameStore } from '../store/gameStore';
-import { GeminiService } from '../services/GeminiService';
 
 interface DialogBoxProps {
   npc: { id: string; name: string } | null;
@@ -20,14 +19,9 @@ export const DialogBox: React.FC<DialogBoxProps> = ({ npc, onClose }) => {
     const playerState = gameStore.getState();
     const activeQuest = playerState.quests.find(q => q.status === 'active');
 
-    const greeting = await GeminiService.generateGreeting({
-      npcId: targetNpc.id,
-      npcName: targetNpc.name,
-      playerLevel: playerState.level,
-      currentQuest: activeQuest?.id
-    });
-    
-    // Typing effect simulation
+    const greeting = `${targetNpc.name}: The fog is thick tonight. Watch yourself.`;
+    void activeQuest;
+
     let current = "";
     for (const char of greeting) {
       current += char;

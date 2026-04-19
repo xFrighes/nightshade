@@ -1,6 +1,6 @@
 export type StorySceneId = 'cell' | 'market' | 'cathedral' | 'gate' | 'outskirts';
 
-export type StoryItemId = 'bread' | 'iron_dagger' | 'rusted_key' | 'coin_pouch' | 'gate_pass' | 'purple_rune';
+export type StoryItemId = 'iron_dagger' | 'rusted_key' | 'coin_pouch' | 'gate_pass' | 'purple_rune';
 
 export type StoryItem = {
   id: StoryItemId;
@@ -10,8 +10,7 @@ export type StoryItem = {
 };
 
 export type StoryFlags = {
-  ratDistracted: boolean;
-  daggerFound: boolean;
+  ratPaid: boolean;
   coinFound: boolean;
   silasChoice: 'none' | 'paid' | 'threatened' | 'owed_favor';
   silasAlive: boolean;
@@ -38,12 +37,6 @@ export type GameAction =
   | { type: 'scene_complete'; scene: StorySceneId };
 
 export const STORY_ITEMS: Record<StoryItemId, StoryItem> = {
-  bread: {
-    id: 'bread',
-    name: 'Bread',
-    description: 'A hard prison loaf. Useful enough to eat, trade, or distract something hungry.',
-    icon: 'B',
-  },
   iron_dagger: {
     id: 'iron_dagger',
     name: 'Iron Dagger',
@@ -78,13 +71,12 @@ export const STORY_ITEMS: Record<StoryItemId, StoryItem> = {
 
 export const INITIAL_STORY_STATE: StoryState = {
   scene: 'cell',
-  inventory: ['bread'],
+  inventory: [],
   gold: 0,
   health: 6,
   maxHealth: 6,
   flags: {
-    ratDistracted: false,
-    daggerFound: false,
+    ratPaid: false,
     coinFound: false,
     silasChoice: 'none',
     silasAlive: true,
@@ -93,7 +85,7 @@ export const INITIAL_STORY_STATE: StoryState = {
     gateOutcome: 'none',
   },
   log: [
-    'Elara wakes in the Iron Cell with only Bread and a city full of rot above her.',
+    'Elara wakes in the Iron Cell. No bread, no key — only the guard and the rat.',
   ],
   dialogueHistory: [],
 };
