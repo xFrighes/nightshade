@@ -11,6 +11,7 @@ interface StoryLogWindowProps {
 const SCALE = 1.1;
 const FRAME_W = 1561 * 0.5 * SCALE;
 const FRAME_H = 1138 * 0.5 * SCALE;
+const CROP_TOP = (3 * 16) + 7; // 3rem + 7px crop
 const CONTENT_SIDE = 42 * SCALE;
 const CONTENT_TOP = 76 * SCALE;
 const CONTENT_BOTTOM = 56 * SCALE;
@@ -67,7 +68,14 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
 
   if (!shouldRender) return null;
 
-  const contentHeight = (FRAME_H - CONTENT_TOP - CONTENT_BOTTOM);
+  // The content area needs to be sized and positioned to fit exactly in the frame hole
+  const holeTop = CONTENT_TOP * SCALE;
+  const holeBottom = (FRAME_H - CONTENT_BOTTOM);
+  const holeHeight = holeBottom - holeTop;
+
+  const contentTop = holeTop - CROP_TOP + (4 * SCALE) + (2 * 16); // 2rem down
+  const contentHeight = holeHeight - (8 * SCALE) + (1.5 * 16); // 1.5rem bigger height
+
   const canScroll = scrollData.scrollHeight > scrollData.clientHeight;
   const thumbHeightRatio = canScroll ? Math.max(0.15, scrollData.clientHeight / scrollData.scrollHeight) : 1;
   const scrollTrackH = contentHeight - 24 * SCALE;
@@ -88,14 +96,15 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{ 
-        position: 'relative', width: FRAME_W, height: FRAME_H,
+        position: 'relative', width: FRAME_W, height: FRAME_H - CROP_TOP,
+        overflow: 'hidden',
         transform: isAnimateIn ? 'scale(1) translateY(0)' : 'scale(0.96) translateY(12px)',
         transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       }}>
 
         {/* ── Header ── */}
         <div style={{ 
-          position: 'absolute', top: 20 * SCALE, left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', top: (34 * SCALE) - (CROP_TOP * 0.4) + (2 * 16), left: '50%', transform: 'translateX(-50%)',
           zIndex: 30, display: 'flex', alignItems: 'center', gap: 12 * SCALE,
           fontFamily: "'Press Start 2P', monospace", fontSize: 16 * SCALE,
           color: '#f0e0a0', textShadow: '2px 2px 0 #3a2000',
@@ -107,7 +116,7 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
 
         {/* ── Wooden frame ── */}
         <img src="/settings-sprite-frame.webp" alt="" draggable={false} style={{
-          position: 'absolute', top: 0, left: 0,
+          position: 'absolute', top: -CROP_TOP, left: 0,
           width: FRAME_W, height: FRAME_H, zIndex: 20, pointerEvents: 'none',
           imageRendering: 'pixelated',
         }}/>
@@ -115,7 +124,7 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
         {/* ── Content area ── */}
         <div style={{
           position: 'absolute',
-          top: CONTENT_TOP,
+          top: contentTop,
           left: CONTENT_SIDE,
           right: CONTENT_SIDE,
           height: contentHeight,
@@ -195,7 +204,7 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
 
         {/* ── Close button ── */}
         <button onClick={onClose} style={{
-          position: 'absolute', bottom: -20 * SCALE, left: '50%',
+          position: 'absolute', bottom: -2 * SCALE + 3, left: '50%',
           transform: 'translateX(-50%)', zIndex: 30,
           width: 372 * SCALE, height: 68 * SCALE,
           backgroundImage: "url('/settings-sprite-button-right-2.webp')",
