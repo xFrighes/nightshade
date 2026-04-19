@@ -13,45 +13,45 @@
   body, #root {
     @apply w-full h-full m-0 p-0 overflow-hidden bg-game-bg text-game-muted antialiased;
     font-family: var(--font-pixel);
-    cursor: url('/cursors/default.png') 15 0, auto;
+    cursor: url('/cursors/default.webp') 15 0, auto;
   }
 }
 
 /* Custom Cursors */
 a, button, [role="button"], .cursor-pointer {
-  cursor: url('/cursors/hover.png') 23 0, pointer !important;
+  cursor: url('/cursors/hover.webp') 23 0, pointer !important;
 }
 
 a:active, button:active, [role="button"]:active, .cursor-pointer:active {
-  cursor: url('/cursors/click.png') 37 0, pointer !important;
+  cursor: url('/cursors/click.webp') 37 0, pointer !important;
 }
 
 .cursor-drag {
-  cursor: url('/cursors/drag.png') 31 20, move !important;
+  cursor: url('/cursors/drag.webp') 31 20, move !important;
 }
 
 .cursor-attack {
-  cursor: url('/cursors/attack.png') 32 21, crosshair !important;
+  cursor: url('/cursors/attack.webp') 32 21, crosshair !important;
 }
 
 .cursor-unavailable, :disabled, .cursor-not-allowed {
-  cursor: url('/cursors/unavailable.png') 35 30, not-allowed !important;
+  cursor: url('/cursors/unavailable.webp') 35 30, not-allowed !important;
 }
 
 .cursor-loading {
-  cursor: url('/cursors/loading.png') 40 26, wait !important;
+  cursor: url('/cursors/loading.webp') 40 26, wait !important;
 }
 
 .cursor-equip {
-  cursor: url('/cursors/equip.png') 39 22, pointer !important;
+  cursor: url('/cursors/equip.webp') 39 22, pointer !important;
 }
 
 .cursor-inventory {
-  cursor: url('/cursors/inventory.png') 31 24, pointer !important;
+  cursor: url('/cursors/inventory.webp') 31 24, pointer !important;
 }
 
 .cursor-help {
-  cursor: url('/cursors/help.png') 17 0, help !important;
+  cursor: url('/cursors/help.webp') 17 0, help !important;
 }
 
 .pixel-border {

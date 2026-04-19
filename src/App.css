@@ -211,7 +211,7 @@
 }
 
 .settings-container {
-  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/bg.png');
+  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/bg.webp');
   background-size: cover;
   background-position: center;
   border: 16px solid #4a3728;

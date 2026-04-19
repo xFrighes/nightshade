@@ -55,6 +55,23 @@ const DIFFICULTY_RULES: Record<string, { kaelenHealth: number; strikeDamage: num
 
 const getDifficultyRules = (difficulty: string) => DIFFICULTY_RULES[difficulty] ?? DIFFICULTY_RULES.Normal;
 
+const getMusicVolume = (settings: SettingsState) => settings.audio.masterVolume * settings.audio.musicVolume;
+
+const syncMusicPlayback = (audio: HTMLAudioElement, settings: SettingsState, shouldPlay: boolean) => {
+  const volume = getMusicVolume(settings);
+  audio.volume = volume;
+  audio.muted = volume <= 0;
+
+  if (volume <= 0 || !shouldPlay) {
+    audio.pause();
+    return;
+  }
+
+  audio.play().catch(() => {
+    console.log('Audio autoplay blocked, waiting for interaction');
+  });
+};
+
 const formatKaelenGeminiError = (err: unknown): string => {
   const message = err instanceof Error ? err.message : 'Gemini failed to answer.';
   return `Gemini could not answer as Kaelen. ${message}`;
@@ -127,11 +144,8 @@ const App: React.FC = () => {
       audioRef.current = new Audio('/soundtrack.mp3');
       audioRef.current.loop = true;
     }
-    audioRef.current.play().catch(e => {
-      // This is expected if user hasn't interacted yet
-      console.log('Audio autoplay blocked, waiting for interaction');
-    });
-  }, []);
+    syncMusicPlayback(audioRef.current, settings, isPreloaded);
+  }, [isPreloaded, settings]);
 
   useEffect(() => {
     const handleSettingsChange = (event: Event) => {
@@ -144,11 +158,6 @@ const App: React.FC = () => {
       gameStore.removeEventListener('settingsChange', handleSettingsChange);
     };
   }, [applyFullscreenPreference]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.volume = settings.audio.masterVolume * settings.audio.musicVolume;
-  }, [settings.audio.masterVolume, settings.audio.musicVolume]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,8 +227,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleInitialInteraction = () => {
       enterFullscreen();
-      if (audioRef.current && audioRef.current.paused) {
-        audioRef.current.play().catch(e => console.warn('Audio playback blocked:', e));
+      if (audioRef.current) {
+        syncMusicPlayback(audioRef.current, settings, isPreloaded);
       }
       document.removeEventListener('mousedown', handleInitialInteraction);
       document.removeEventListener('keydown', handleInitialInteraction);
@@ -230,7 +239,7 @@ const App: React.FC = () => {
       document.removeEventListener('mousedown', handleInitialInteraction);
       document.removeEventListener('keydown', handleInitialInteraction);
     };
-  }, [enterFullscreen]);
+  }, [enterFullscreen, isPreloaded, settings]);
 
   const inventory = useMemo(() => story.inventory.map((id) => STORY_ITEMS[id]), [story.inventory]);
 
@@ -811,7 +820,7 @@ const App: React.FC = () => {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center p-8 font-pixel bg-[#08060d]">
         <img 
-          src="/starting-screen.png" 
+          src="/starting-screen.webp" 
           className="absolute inset-0 w-full h-full object-cover -z-10" 
           alt=""
           style={{ opacity: isPreloaded ? 1 : 0, transition: 'opacity 0.8s ease' }}
@@ -894,11 +903,11 @@ const App: React.FC = () => {
 
       {!isLoading && uiVisible && (
         <React.Fragment key={hudKey}>
-          <img src="/UI.png" className="game-frame-overlay" alt="" />
+          <img src="/UI.webp" className="game-frame-overlay" alt="" />
 
           {/* Top-left: character portrait */}
           <div className="ui-portrait">
-            <img src="/portrait.png" className="ui-portrait-img" alt="Character" />
+            <img src="/portrait.webp" className="ui-portrait-img" alt="Character" />
           </div>
 
           {/* Top-left: HP bars to the right of portrait */}
@@ -1237,7 +1246,7 @@ const LoadingScreen: React.FC<{ progress: number; error: string | null }> = ({ p
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-end pb-[15vh] font-pixel overflow-hidden z-[200]">
       <img 
-        src="/starting-screen.png" 
+        src="/starting-screen.webp" 
         className="absolute inset-0 w-full h-full object-cover -z-10" 
         alt=""
         loading="eager"
@@ -1279,7 +1288,7 @@ const LoadingScreen: React.FC<{ progress: number; error: string | null }> = ({ p
             
             {/* Acorn Indicator */}
             <img 
-               src="/settings-sprite-acorn.png" 
+               src="/settings-sprite-acorn.webp" 
                alt="" 
                draggable={false}
                style={{

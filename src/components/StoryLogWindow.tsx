@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, ScrollText, History } from 'lucide-react';
-import { type StoryState, type HistoryEntry } from '../game/storyTypes';
+import { Sparkles, ScrollText, History } from 'lucide-react';
+import { type HistoryEntry } from '../game/storyTypes';
 
 interface StoryLogWindowProps {
   isOpen: boolean;
@@ -33,10 +33,14 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
   };
 
   useEffect(() => {
+    let renderTimer: ReturnType<typeof setTimeout> | undefined;
+    let animateTimer: ReturnType<typeof setTimeout> | undefined;
+    let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+
     if (isOpen) {
-      setShouldRender(true);
-      setTimeout(() => setIsAnimateIn(true), 10);
-      setTimeout(() => {
+      renderTimer = setTimeout(() => setShouldRender(true), 0);
+      animateTimer = setTimeout(() => setIsAnimateIn(true), 10);
+      scrollTimer = setTimeout(() => {
         updateScrollData();
         // Scroll to bottom on open
         if (scrollRef.current) {
@@ -44,10 +48,15 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
         }
       }, 50);
     } else {
-      setIsAnimateIn(false);
-      const timer = setTimeout(() => setShouldRender(false), 200);
-      return () => clearTimeout(timer);
+      animateTimer = setTimeout(() => setIsAnimateIn(false), 0);
+      renderTimer = setTimeout(() => setShouldRender(false), 200);
     }
+
+    return () => {
+      if (renderTimer) clearTimeout(renderTimer);
+      if (animateTimer) clearTimeout(animateTimer);
+      if (scrollTimer) clearTimeout(scrollTimer);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -97,7 +106,7 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
         </div>
 
         {/* ── Wooden frame ── */}
-        <img src="/settings-sprite-frame.png" alt="" draggable={false} style={{
+        <img src="/settings-sprite-frame.webp" alt="" draggable={false} style={{
           position: 'absolute', top: 0, left: 0,
           width: FRAME_W, height: FRAME_H, zIndex: 20, pointerEvents: 'none',
           imageRendering: 'pixelated',
@@ -189,7 +198,7 @@ export const StoryLogWindow: React.FC<StoryLogWindowProps> = ({ isOpen, onClose,
           position: 'absolute', bottom: -20 * SCALE, left: '50%',
           transform: 'translateX(-50%)', zIndex: 30,
           width: 372 * SCALE, height: 68 * SCALE,
-          backgroundImage: "url('/settings-sprite-button-right-2.png')",
+          backgroundImage: "url('/settings-sprite-button-right-2.webp')",
           backgroundSize: '100% 100%', border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 * SCALE,
           fontFamily: "'Press Start 2P', monospace", fontSize: 12.5 * SCALE,

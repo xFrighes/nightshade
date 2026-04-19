@@ -113,7 +113,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ isOpen, onClose,
           {TABS.map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               width: TAB_W, height: TAB_H,
-              backgroundImage: `url('/settings-sprite-tab-${activeTab === tab ? 'active' : 'inactive'}.png')`,
+              backgroundImage: `url('/settings-sprite-tab-${activeTab === tab ? 'active' : 'inactive'}.webp')`,
               backgroundSize: '100% 100%', border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11 * SCALE, fontFamily: "'Press Start 2P', monospace",
@@ -129,7 +129,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ isOpen, onClose,
         </div>
 
         {/* ── Wooden frame ── */}
-        <img src="/settings-sprite-frame.png" alt="" draggable={false} style={{
+        <img src="/settings-sprite-frame.webp" alt="" draggable={false} style={{
           position: 'absolute', top: TAB_H - 2 * SCALE, left: 0,
           width: FRAME_W, height: FRAME_H, zIndex: 20, pointerEvents: 'none',
           imageRendering: 'pixelated',
@@ -212,7 +212,7 @@ export const SettingsWindow: React.FC<SettingsWindowProps> = ({ isOpen, onClose,
           position: 'absolute', bottom: 6 * SCALE, left: '50%',
           transform: 'translateX(-50%)', zIndex: 30,
           width: 372 * SCALE, height: 68 * SCALE,
-          backgroundImage: "url('/settings-sprite-button-right-2.png')",
+          backgroundImage: "url('/settings-sprite-button-right-2.webp')",
           backgroundSize: '100% 100%', border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 * SCALE,
           fontFamily: "'Press Start 2P', monospace", fontSize: 12.5 * SCALE,
@@ -478,7 +478,7 @@ const AcornSlider: React.FC<{ value: number; onChange: (v: number) => void; scal
         background: 'linear-gradient(180deg,#8a6838 0%,#c09050 50%,#8a6838 100%)',
         borderRadius: trackH / 2, pointerEvents: 'none'
       }}/>
-      <img src="/settings-sprite-acorn.png" alt="" draggable={false} style={{
+      <img src="/settings-sprite-acorn.webp" alt="" draggable={false} style={{
         position: 'absolute', left: thumbPos, width: thumbW, height: thumbH,
         imageRendering: 'pixelated', pointerEvents: 'none',
         filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.7))',

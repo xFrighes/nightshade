@@ -61,6 +61,7 @@ export class GameScene extends Phaser.Scene {
   private stamina = 10;
   private maxStamina = 10;
   private staminaRegenTimer = 0;
+  private footstepTimer = 0;
   private settings?: SettingsState;
 
   constructor() { super('GameScene'); }
@@ -79,17 +80,23 @@ export class GameScene extends Phaser.Scene {
       this.game.events.emit('asset_load_complete');
     });
 
-    this.load.image('bg_cell', '/bg_cell.png');
-    this.load.image('bg_cell_open', '/bg_cell_open.png');
-    this.load.image('bg_market', '/bg_market.png');
-    this.load.image('bg_cathedral', '/bg_cathedral.png');
-    this.load.image('bg_gate', '/bg_gate.png');
-    this.load.image('bg_escape', '/bg_escape.png');
-    this.load.image('bg_city', '/bg_city.png');
-    this.load.image('bg_underground', '/bg_underground.png');
-    this.load.image('rat', '/rat.png');
-    this.load.spritesheet('guide', '/guide.png', { frameWidth: 170, frameHeight: 279 });
-    this.load.atlas('player_anim', '/player_sheet.png', '/player_sheet.json');
+    this.load.image('bg_cell', '/bg_cell.webp');
+    this.load.image('bg_cell_open', '/bg_cell_open.webp');
+    this.load.image('bg_market', '/bg_market.webp');
+    this.load.image('bg_cathedral', '/bg_cathedral.webp');
+    this.load.image('bg_gate', '/bg_gate.webp');
+    this.load.image('bg_escape', '/bg_escape.webp');
+    this.load.image('bg_city', '/bg_city.webp');
+    this.load.image('bg_underground', '/bg_underground.webp');
+    this.load.image('rat', '/rat.webp');
+    this.load.spritesheet('guide', '/guide.webp', { frameWidth: 170, frameHeight: 279 });
+    this.load.atlas('player_anim', '/player_sheet.webp', '/player_sheet.json');
+
+    this.load.audio('sfx_jump', '/sounds/jump.wav');
+    this.load.audio('sfx_collect', '/sounds/collect.wav');
+    this.load.audio('sfx_interact', '/sounds/interact.wav');
+    this.load.audio('sfx_footstep', '/sounds/footstep.wav');
+    this.load.audio('sfx_click', '/sounds/click.wav');
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -206,8 +213,20 @@ export class GameScene extends Phaser.Scene {
     body.setVelocityX(0);
     if (left) { body.setVelocityX(-speed); this.player.setFlipX(true); }
     if (right) { body.setVelocityX(speed); this.player.setFlipX(false); }
+
+    if ((left || right) && body.blocked.down) {
+      this.footstepTimer += delta;
+      if (this.footstepTimer >= 320) {
+        this.sound.play('sfx_footstep', { volume: 0.15 * (this.settings?.audio.masterVolume ?? 1) });
+        this.footstepTimer = 0;
+      }
+    } else {
+      this.footstepTimer = 300; // Ready for first step when starting to walk
+    }
+
     if (jumpPressed && body.blocked.down && this.stamina >= 2) {
       body.setVelocityY(-jump);
+      this.sound.play('sfx_jump', { volume: 0.4 * (this.settings?.audio.masterVolume ?? 1) });
       this.virtualInput.jump = false;
       this.stamina -= 2;
       this.game.events.emit('stamina_update', this.stamina / this.maxStamina);
@@ -237,10 +256,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.hideUIKey)) {
+      this.sound.play('sfx_click', { volume: 0.3 * (this.settings?.audio.masterVolume ?? 1) });
       this.game.events.emit('toggle_ui');
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.actionKeys.inventory)) {
+      this.sound.play('sfx_click', { volume: 0.3 * (this.settings?.audio.masterVolume ?? 1) });
       this.game.events.emit('toggle_inventory');
     }
 
@@ -596,6 +617,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private emitAction(action: GameAction) {
+    const volume = 0.5 * (this.settings?.audio.masterVolume ?? 1);
+    if (action.type === 'collect') {
+      this.sound.play('sfx_collect', { volume });
+    } else {
+      this.sound.play('sfx_interact', { volume });
+    }
     this.shakeCamera(120, 0.0035);
     this.game.events.emit('game_action', action);
   }
