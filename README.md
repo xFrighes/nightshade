@@ -46,4 +46,4 @@ A polished vertical slice of a dark medieval city RPG, built with an MMO-like st
 The project uses a **Hybrid State Model**. Phaser handles the real-time simulation, while React manages the complex UI overlays. Both sync via a centralized `GameStore` that persists state to `localStorage`.
 
 ---
-*Created for the Game Design & Prototyping Challenge.*
+*Created for the AI Hackfest hosted by Major League Hacking.*
