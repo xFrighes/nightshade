@@ -1,27 +1,36 @@
-# Architecture Notes: Dark Low-Fantasy RPG Vertical Slice
+# Architecture Notes
 
-## Game Architecture Overview
-The game follows a **Hybrid State Model** where a centralized source of truth (the React State) drives the UI and persists the player data, while a high-performance engine (Phaser 3) manages real-time physics, rendering, and gameplay interactions.
+Nightshade uses a small hybrid architecture: Phaser handles the real-time scene, while React handles interface state, overlays, persistence, and external service calls.
 
-### 1. Game Loop (Phaser 3)
-- **Scene Management**: A single `GameScene` handles the belt-scroll environment. 
-- **Entity System**: The `Player` and `NPC` classes are Phaser Sprites with added logic for movement, collision detection, and interaction range.
-- **2.5D Logic**: Ground plane navigation using a fixed walk area (`y` bounds) to simulate depth while keeping the movement 2D (left/right).
+## Runtime Boundaries
 
-### 2. Persistence Model
-- **Local Storage**: Player stats, inventory, quest progress, and reputation are serialized and saved to `localStorage` on every meaningful state change.
-- **MMO Simulation**: A deterministic mock "World Feed" generates entries based on the current system time to simulate activity from other players.
+- `src/game/GameScene.ts` owns rendering, physics, interaction zones, scene transitions, and input polling.
+- `src/App.tsx` owns story decisions, modal state, combat state, asset loading, wallet flow, and top-level UI orchestration.
+- `src/store/gameStore.ts` persists settings, player state, quests, and world feed entries to local storage.
+- `src/game/storyTypes.ts` keeps story scenes, flags, item definitions, and scene metadata centralized.
 
-### 3. AI Integration (Gemini API)
-- **Layering**: AI is used to *decorate* dialogue. It does not decide game outcomes.
-- **Flow**: User interacts -> System sends context (NPC role, current quest, player attitude) -> Gemini returns a styled greeting or response -> Text is displayed in the React `DialogBox`.
-- **Safety**: Fallbacks are built-in for every call; if the API fails, a pre-written static response is used instantly.
+## React and Phaser Bridge
 
-### 4. React-Phaser Bridge
-- **Emitter System**: Phaser emits events (e.g., `NPC_INTERACT`, `PLAYER_MOVE`) that React listens to.
-- **Sync**: React state updates are reflected in the HUD, while Phaser state updates are triggered by user input.
+Phaser emits browser events for gameplay changes such as movement, scene changes, and interaction prompts. React listens for those events and updates the overlays. React also sends story updates back to Phaser through the store so the scene can reflect unlocked doors, hidden characters, and completed interactions.
 
-### 5. MMO-like Features (Hackathon Scope)
-- **Presence**: Simulated by random "adventurer" chat messages and reputation titles.
-- **Scaling**: The state structure is designed to be easily extensible to a real backend if needed.
-- **UI Design**: A heavy, immersive MMO-style interface with inventory slots, quest logs, and a world chat log.
+## Persistence
+
+The current build is client-only. Save data lives in local storage and is intentionally scoped to:
+
+- player stats
+- inventory
+- story flags
+- quest progress
+- user settings
+
+The state shape is narrow enough to replace local storage with a backend later without rewriting the game scene.
+
+## External Services
+
+Gemini is optional and only styles dialogue. It does not decide game outcomes. Every Gemini call has an authored fallback so the game remains playable offline or without an API key.
+
+The Solana wallet flow is optional and limited to the devnet rat bribe interaction. The game checks wallet availability, requests a connection, and falls back to normal story handling if the wallet flow is unavailable.
+
+## Asset Loading
+
+`src/game/assetManifest.ts` lists browser-preloaded assets separately from Phaser-loaded scene assets. This keeps the start screen responsive while still warming the cache for the full play session.
