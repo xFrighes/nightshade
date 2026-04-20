@@ -56,3 +56,6 @@ npm run build
 ## Architecture
 
 Phaser owns the real-time game loop and emits gameplay events such as scene changes, player movement, and interactable selection. React owns application state, persistence, overlays, and service calls. Shared state flows through `src/store/gameStore.ts`, with story progression modeled in `src/game/storyTypes.ts`.
+
+---
+*Created for the AI Hackfest hosted by Major League Hacking.*
